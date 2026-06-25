@@ -5,6 +5,7 @@ import { ILLMProvider, ChatMessage, Tool } from './providers/base';
 import { createProvider } from './providers/factory';
 import { initializeSecretStorage, getSecret, setSecret } from './utils/secretStorage';
 import { getLogger } from './utils/logger';
+import { ContextManager } from './utils/contextManager';
 import {
   WebviewToExtMessage,
   ExtensionToWebviewMessage,
@@ -307,6 +308,19 @@ async function handleChatSend(userMessage: string): Promise<void> {
       }> = [];
 
       let assistantTextBuffer = '';
+
+      // Context window management: trim old exchanges if token limit exceeded
+      const trimResult = await ContextManager.trim(conversationHistory, provider);
+      if (trimResult.trimmed) {
+        // In-place update of conversationHistory
+        conversationHistory.splice(0, conversationHistory.length, ...trimResult.messages);
+        logger.info(`Context trimmed: removed ${trimResult.removedCount} messages`);
+        // Notify WebView (optional)
+        sendMessage({
+          type: 'stream_chunk',
+          payload: { content: `\n_[컨텍스트 정리: ${trimResult.removedCount}개 오래된 메시지 제거됨]_\n` },
+        });
+      }
 
       // Stream one turn from Claude
       for await (const chunk of provider.chat(conversationHistory, TOOLS, signal)) {
