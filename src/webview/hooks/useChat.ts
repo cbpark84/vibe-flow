@@ -4,7 +4,7 @@ import { useVSCode } from './useVSCode';
 
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant' | 'tool';
+  role: 'user' | 'assistant' | 'tool' | 'error';
   content: string;
   toolName?: string;
   requestId?: string;
@@ -13,6 +13,8 @@ export interface ChatMessage {
   diff?: string;
   isNewFile?: boolean;
   command?: string;
+  errorType?: string;
+  retryable?: boolean;
 }
 
 export function useChat() {
@@ -59,12 +61,19 @@ export function useChat() {
         }
         case 'stream_error': {
           setIsStreaming(false);
+          const { message: errorMsg, errorType, retryable } = message.payload as {
+            message: string;
+            errorType?: string;
+            retryable?: boolean;
+          };
           setMessages(prev => [
             ...prev,
             {
               id: `msg-${Date.now()}`,
-              role: 'assistant',
-              content: `Error: ${message.payload.message}`,
+              role: 'error',
+              content: errorMsg,
+              errorType,
+              retryable,
             },
           ]);
           break;
@@ -161,6 +170,22 @@ export function useChat() {
         case 'history_cleared': {
           // Phase 3: 히스토리 삭제됨
           setMessages([]);
+          break;
+        }
+        case 'approval_timeout': {
+          const { requestId, message: timeoutMsg } = message.payload as {
+            requestId: string;
+            message: string;
+          };
+          setMessages(prev => [
+            ...prev,
+            {
+              id: `msg-${Date.now()}`,
+              role: 'error',
+              content: timeoutMsg,
+              requestId,
+            },
+          ]);
           break;
         }
       }

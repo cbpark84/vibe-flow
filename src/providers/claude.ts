@@ -1,10 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import {
-  ILLMProvider,
-  ChatMessage,
-  Tool,
-  StreamChunk,
-} from './base';
+import { ILLMProvider, ChatMessage, Tool, StreamChunk } from './base';
 
 export class ClaudeProvider implements ILLMProvider {
   private client: Anthropic | null = null;
@@ -13,7 +8,13 @@ export class ClaudeProvider implements ILLMProvider {
   readonly maxTokens = 200000;
 
   async initialize(apiKey: string): Promise<void> {
-    this.client = new Anthropic({ apiKey });
+    // Configure Anthropic client with explicit timeout (공식 권장: 기본 600초는 너무 김)
+    // maxRetries: SDK가 429, 500+, 네트워크 에러 자동 재시도 (기본값 2)
+    this.client = new Anthropic({
+      apiKey,
+      timeout: 60 * 1000, // 60초 — VSCode 플러그인에서 사용자 경험 개선
+      maxRetries: 2,      // 명시적 설정 (기본값과 동일하지만 명확성 위해)
+    });
   }
 
   async *chat(
@@ -26,7 +27,7 @@ export class ClaudeProvider implements ILLMProvider {
     }
 
     // Convert tools to Anthropic format
-    const anthropicTools: Anthropic.Tool[] = (tools ?? []).map(tool => ({
+    const anthropicTools: Anthropic.Tool[] = (tools ?? []).map((tool) => ({
       name: tool.name,
       description: tool.description,
       input_schema: tool.inputSchema as Anthropic.Tool['input_schema'],
@@ -56,7 +57,10 @@ export class ClaudeProvider implements ILLMProvider {
 
     try {
       for await (const event of stream) {
-        if (signal?.aborted) throw new Error('Aborted');
+        if (signal?.aborted) {
+          // 공식 패턴: abort는 APIUserAbortError 발동 (아래 catch에서 처리)
+          throw new Error('Aborted');
+        }
 
         if (event.type === 'content_block_start') {
           const block = event.content_block;
@@ -64,7 +68,6 @@ export class ClaudeProvider implements ILLMProvider {
             // Record tool identity; input arrives via input_json_delta
             toolBuffers.set(event.index, { id: block.id, name: block.name, json: '' });
           }
-
         } else if (event.type === 'content_block_delta') {
           const delta = event.delta;
           if (delta.type === 'text_delta' && delta.text) {
@@ -76,7 +79,6 @@ export class ClaudeProvider implements ILLMProvider {
               buf.json += delta.partial_json;
             }
           }
-
         } else if (event.type === 'content_block_stop') {
           const buf = toolBuffers.get(event.index);
           if (buf) {
@@ -98,8 +100,19 @@ export class ClaudeProvider implements ILLMProvider {
         }
       }
     } catch (error) {
-      if ((error as Error).message === 'Aborted') throw error;
-      throw error;
+      // 공식 패턴: APIUserAbortError는 정상적인 취소 (재전파 필요)
+      if (error instanceof Anthropic.APIUserAbortError) {
+        throw error;
+      }
+      // 일반적인 'Aborted' 메시지도 정상 취소로 처리 (사용자 UI에서 throw)
+      if ((error as Error).message === 'Aborted') {
+        throw error;
+      }
+      // Re-throw Anthropic errors with type info for proper handling in extension.ts
+      if (error instanceof Anthropic.APIError) {
+        throw error;
+      }
+      throw new Error(`Claude API streaming error: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -133,7 +146,6 @@ function buildAnthropicMessages(messages: ChatMessage[]): Anthropic.MessageParam
       // Plain user message
       result.push({ role: 'user', content: msg.content });
       i++;
-
     } else if (msg.role === 'assistant') {
       // Collect consecutive assistant messages (text + tool_use blocks)
       const blocks: Anthropic.ContentBlock[] = [];
@@ -159,7 +171,6 @@ function buildAnthropicMessages(messages: ChatMessage[]): Anthropic.MessageParam
       } else {
         result.push({ role: 'assistant', content: blocks });
       }
-
     } else if (msg.role === 'tool') {
       // Tool result — must be a user message with tool_result block
       result.push({

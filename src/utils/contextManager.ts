@@ -58,10 +58,7 @@ export class ContextManager {
   /**
    * 메시지 목록의 총 토큰 수를 추정한다.
    */
-  static async countTotal(
-    messages: ChatMessage[],
-    provider: ILLMProvider
-  ): Promise<number> {
+  static async countTotal(messages: ChatMessage[], provider: ILLMProvider): Promise<number> {
     let total = 0;
     for (const msg of messages) {
       total += await provider.countTokens(msg.content);
@@ -73,10 +70,7 @@ export class ContextManager {
    * 현재 토큰 사용 현황을 반환한다.
    * limit는 triggerPercent 기준으로 표시.
    */
-  static async getUsage(
-    messages: ChatMessage[],
-    provider: ILLMProvider
-  ): Promise<TokenUsage> {
+  static async getUsage(messages: ChatMessage[], provider: ILLMProvider): Promise<TokenUsage> {
     const { triggerPercent } = this.getThresholds(provider);
     const used = await this.countTotal(messages, provider);
     const limit = Math.floor(provider.maxTokens * (triggerPercent / 100));
@@ -146,7 +140,7 @@ export class ContextManager {
     for (const msg of messages) {
       const isNewUserTurn =
         msg.role === 'user' &&
-        !msg.toolCallId &&   // tool_result 아님
+        !msg.toolCallId && // tool_result 아님
         current.length > 0;
 
       if (isNewUserTurn) {

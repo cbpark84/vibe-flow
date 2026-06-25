@@ -40,7 +40,7 @@ export interface WVMsg_ApproveRunTerminal {
 export interface WVMsg_SaveApiKey {
   type: 'save_api_key';
   payload: {
-    provider: string;   // 예: 'claude'
+    provider: string; // 예: 'claude'
     apiKey: string;
   };
 }
@@ -52,8 +52,6 @@ export interface WVMsg_CheckApiKey {
     provider: string;
   };
 }
-
-
 
 // ─────────────────────────────────────────────────────────────
 // Extension → WebView 메시지 (Extension이 발송, WebView가 수신)
@@ -77,6 +75,8 @@ export interface ExtMsg_StreamError {
   type: 'stream_error';
   payload: {
     message: string;
+    errorType?: 'auth' | 'rate_limit' | 'network' | 'server' | 'tool_loop' | 'unknown';
+    retryable?: boolean;
   };
 }
 
@@ -136,18 +136,6 @@ export interface ExtMsg_Error {
   };
 }
 
-/** 모든 Extension → WebView 메시지의 유니온 타입 */
-export type ExtensionToWebviewMessage =
-  | ExtMsg_StreamChunk
-  | ExtMsg_StreamEnd
-  | ExtMsg_StreamError
-  | ExtMsg_RequestWriteFile
-  | ExtMsg_RequestRunTerminal
-  | ExtMsg_ToolResult
-  | ExtMsg_ApiKeyStatus
-  | ExtMsg_Error
-  | ExtMsg_ProviderChanged
-  | ExtMsg_ProviderList;
 
 // ─────────────────────────────────────────────────────────────
 // Phase 2: 프로바이더 관련 메시지
@@ -211,7 +199,44 @@ export interface ExtMsg_HistoryCleared {
   type: 'history_cleared';
 }
 
-/** 업데이트된 WebView → Extension 유니온 (Phase 3) */
+// ─────────────────────────────────────────────────────────────
+// Phase 4: 워크스페이스 설정 관련 메시지
+// ─────────────────────────────────────────────────────────────
+
+/** 워크스페이스 레벨 설정 */
+export interface WorkspaceConfig {
+  defaultProvider: 'claude' | 'openai' | 'gemini' | 'ollama';
+  systemPrompt: string;
+  maxTokensPerRequest: number;
+}
+
+/** WebView → Extension: VSCode 설정 패널 열기 요청 */
+export interface WVMsg_OpenSettings {
+  type: 'open_settings';
+}
+
+/** Extension → WebView: 초기 워크스페이스 설정 전달 */
+export interface ExtMsg_WorkspaceConfigInit {
+  type: 'workspace_config_init';
+  payload: WorkspaceConfig;
+}
+
+/** Extension → WebView: 워크스페이스 설정 변경 알림 */
+export interface ExtMsg_WorkspaceConfigChanged {
+  type: 'workspace_config_changed';
+  payload: WorkspaceConfig;
+}
+
+/** Extension → WebView: 도구 승인 대기 시간 초과 */
+export interface ExtMsg_ApprovalTimeout {
+  type: 'approval_timeout';
+  payload: {
+    requestId: string;
+    message: string;
+  };
+}
+
+/** 업데이트된 WebView → Extension 유니온 (Phase 4) */
 export type WebviewToExtMessage =
   | WVMsg_SendChat
   | WVMsg_AbortStream
@@ -222,9 +247,10 @@ export type WebviewToExtMessage =
   | WVMsg_SelectProvider
   | WVMsg_GetProviderList
   | WVMsg_GetHistory
-  | WVMsg_ClearHistory;
+  | WVMsg_ClearHistory
+  | WVMsg_OpenSettings;
 
-/** 업데이트된 Extension → WebView 유니온 (Phase 3) */
+/** 업데이트된 Extension → WebView 유니온 (Phase 4) */
 export type ExtensionToWebviewMessage =
   | ExtMsg_StreamChunk
   | ExtMsg_StreamEnd
@@ -237,4 +263,7 @@ export type ExtensionToWebviewMessage =
   | ExtMsg_ProviderChanged
   | ExtMsg_ProviderList
   | ExtMsg_HistoryLoaded
-  | ExtMsg_HistoryCleared;
+  | ExtMsg_HistoryCleared
+  | ExtMsg_WorkspaceConfigInit
+  | ExtMsg_WorkspaceConfigChanged
+  | ExtMsg_ApprovalTimeout;

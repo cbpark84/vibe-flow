@@ -26,6 +26,28 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
     );
   }
 
+  if (message.role === 'error') {
+    return (
+      <div className="flex justify-start mb-4">
+        <div className="max-w-xs lg:max-w-md rounded-lg px-4 py-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800">
+          <div className="flex items-start gap-2">
+            <span className="text-red-500 text-sm mt-0.5">⚠️</span>
+            <div className="flex-1">
+              <p className="text-sm text-red-800 dark:text-red-200 whitespace-pre-wrap">
+                {message.content}
+              </p>
+              {message.retryable && (
+                <p className="text-xs text-red-600 dark:text-red-400 mt-2 font-medium">
+                  💡 잠시 후 다시 시도해 주세요.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (message.role === 'tool') {
     return (
       <div className="flex justify-start mb-4">

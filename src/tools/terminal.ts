@@ -39,10 +39,7 @@ export function checkDangerousPattern(command: string): { isDangerous: boolean; 
   return { isDangerous: false };
 }
 
-export async function handleApproveTerminal(
-  requestId: string,
-  approved: boolean
-): Promise<void> {
+export async function handleApproveTerminal(requestId: string, approved: boolean): Promise<void> {
   const approval = pendingApprovals.get(requestId);
   if (approval) {
     approval.resolve(approved);

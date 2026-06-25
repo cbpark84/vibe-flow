@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useChat } from './hooks/useChat';
 import ChatPanel from './components/ChatPanel';
 import InputBar from './components/InputBar';
 import ProviderSelector from './components/ProviderSelector';
+import SettingsPanel, { WorkspaceConfig } from './components/SettingsPanel';
 
 export default function App() {
   const {
@@ -18,6 +19,28 @@ export default function App() {
     clearHistory,
   } = useChat();
 
+  const [showSettings, setShowSettings] = useState(false);
+  const [workspaceConfig, setWorkspaceConfig] = useState<WorkspaceConfig | null>(null);
+
+  // Phase 4: Extension 메시지 수신 처리 추가
+  React.useEffect(() => {
+    const vscode = window.acquireVsCodeApi?.();
+    if (!vscode) return;
+
+    const messageHandler = (event: MessageEvent) => {
+      const message = event.data;
+
+      if (message.type === 'workspace_config_init') {
+        setWorkspaceConfig(message.payload);
+      } else if (message.type === 'workspace_config_changed') {
+        setWorkspaceConfig(message.payload);
+      }
+    };
+
+    window.addEventListener('message', messageHandler);
+    return () => window.removeEventListener('message', messageHandler);
+  }, []);
+
   return (
     <div className="flex flex-col h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
       <header className="px-4 py-3 border-b border-gray-300 dark:border-gray-600 flex items-center justify-between gap-2">
@@ -29,6 +52,14 @@ export default function App() {
             isStreaming={isStreaming}
             onSelect={selectProvider}
           />
+          <button
+            onClick={() => setShowSettings(true)}
+            disabled={isStreaming}
+            title="Workspace settings"
+            className="text-sm px-2 py-1 rounded border border-gray-400 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:border-gray-600 dark:hover:border-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            ⚙️
+          </button>
           <button
             onClick={clearHistory}
             disabled={isStreaming || messages.length === 0}
@@ -44,11 +75,19 @@ export default function App() {
         onApproveWriteFile={approveWriteFile}
         onApproveRunTerminal={approveRunTerminal}
       />
-      <InputBar
-        onSend={sendMessage}
-        onCancel={cancelStreaming}
-        isStreaming={isStreaming}
-      />
+      <InputBar onSend={sendMessage} onCancel={cancelStreaming} isStreaming={isStreaming} />
+
+      {/* Phase 4: Settings Panel */}
+      {showSettings && (
+        <SettingsPanel
+          config={workspaceConfig}
+          onClose={() => setShowSettings(false)}
+          onOpenVSCodeSettings={() => {
+            const vscode = window.acquireVsCodeApi?.();
+            vscode?.postMessage({ type: 'open_settings' });
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -1,11 +1,17 @@
-let vscodeApi: any = null;
+// VSCode WebView API type
+interface VsCodeApi {
+  postMessage(message: unknown): void;
+}
 
-export function useVSCode() {
+let vscodeApi: VsCodeApi | null = null;
+
+export function useVSCode(): VsCodeApi {
   if (!vscodeApi) {
-    vscodeApi = (window as any).acquireVsCodeApi?.();
-    if (!vscodeApi) {
+    const api = (window as unknown as { acquireVsCodeApi?: () => VsCodeApi }).acquireVsCodeApi?.();
+    if (!api) {
       throw new Error('VSCode API not available');
     }
+    vscodeApi = api;
   }
   return vscodeApi;
 }

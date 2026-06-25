@@ -13,10 +13,14 @@ export function createProvider(providerName: string): ILLMProvider {
   const name = providerName.toLowerCase() as ProviderKey;
 
   switch (name) {
-    case 'claude': return new ClaudeProvider();
-    case 'openai': return new OpenAIProvider();
-    case 'gemini': return new GeminiProvider();
-    case 'ollama': return new OllamaProvider();
+    case 'claude':
+      return new ClaudeProvider();
+    case 'openai':
+      return new OpenAIProvider();
+    case 'gemini':
+      return new GeminiProvider();
+    case 'ollama':
+      return new OllamaProvider();
     default:
       throw new Error(`Unknown provider: ${providerName}`);
   }

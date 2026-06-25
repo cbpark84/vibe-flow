@@ -17,6 +17,7 @@
 - **채팅 히스토리** — VSCode 재시작해도 대화 내역 유지, Clear 버튼으로 초기화
 - **스마트 컨텍스트 관리** — 프로바이더별 차등 임계값으로 할루시네이션 방지
 - **API 키 보안 저장** — VSCode SecretStorage 암호화 저장 (코드/파일에 절대 저장 안 함)
+- **🛡️ 강화된 에러 처리** — Anthropic 공식 SDK 에러 타입 기반 구분 (인증/레이트 리미트/네트워크 오류)
 
 ---
 
@@ -143,6 +144,26 @@ VSCode 커맨드 팔레트 (Cmd+Shift+P / Ctrl+Shift+P):
 ---
 
 ## Settings
+
+### Workspace Settings (`.vscode/settings.json`)
+
+VSCode의 Workspace 레벨 설정에서 Vibe Flow를 커스터마이징할 수 있습니다:
+
+```json
+{
+  "vibeflow.defaultProvider": "claude",
+  "vibeflow.systemPrompt": "You are an expert developer for this project.",
+  "vibeflow.maxTokensPerRequest": 4096
+}
+```
+
+| 설정 키 | 기본값 | 설명 |
+|---------|--------|------|
+| `vibeflow.defaultProvider` | `claude` | 기본 LLM 프로바이더 (claude/openai/gemini/ollama) |
+| `vibeflow.systemPrompt` | (빈 문자열) | 워크스페이스 커스텀 시스템 프롬프트 |
+| `vibeflow.maxTokensPerRequest` | `4096` | 한 번의 요청당 최대 토큰 수 |
+
+### Context Window Management
 
 VSCode `Settings`에서 `Vibe Flow > Context`를 검색하면 프로바이더별 컨텍스트 임계값을 조절할 수 있습니다.
 
@@ -290,16 +311,23 @@ tsconfig.json
 |-------|------|------|
 | **Phase 1** | ✅ 완료 | MVP — Claude + 파일 + 터미널 |
 | **Phase 2** | ✅ 완료 | 멀티 프로바이더 (OpenAI, Gemini, Ollama) |
-| **Phase 3** | ✅ 완료 | 고급 기능 (탐색/검색, 히스토리, 컨텍스트 관리) |
-| **Phase 4** | 🔜 예정 | VSCode 마켓플레이스 배포 |
+| **Phase 3** | ✅ 완료 | 고급 기능 (탐색/검색, 히스토리, 컨텍스트 관리, Diff UI, 워크스페이스 설정) |
+| **Phase 4** | 🔄 진행 중 | VSCode 마켓플레이스 배포 (에러 처리 개선, 통합 테스트, 배포 준비) |
 
 ### Phase 3 세부 완료 항목
 - ✅ `list_directory` — 디렉토리 구조 탐색
 - ✅ `search_code` — 정규식 코드 검색
 - ✅ 채팅 히스토리 저장/로드 (VSCode globalState)
 - ✅ 컨텍스트 윈도우 관리 (exchange 단위 트림, 프로바이더별 차등 임계값)
-- ⏳ Diff UI 개선 (Phase 4로 이동)
-- ⏳ 워크스페이스별 설정 (Phase 4로 이동)
+- ✅ Diff UI 개선 (라인 번호, 헝크 헤더, 변경 통계 포함)
+- ✅ 워크스페이스별 설정 (defaultProvider, systemPrompt, maxTokensPerRequest)
+
+### Phase 4 진행 항목 (Step 1: 에러 처리 개선)
+- ✅ Anthropic 공식 SDK 에러 타입 분류 및 사용자 친화적 메시지
+- ✅ retry-after 헤더 기반 레이트 리미트 대기 시간 계산
+- ✅ 요청 ID 로깅 (API 지원 티켓용)
+- ✅ Tool loop 최대 10회 제한 (무한 재시도 방지)
+- ✅ 승인 대기 2분 타임아웃 (write_file, run_terminal)
 
 ---
 
@@ -345,5 +373,5 @@ MIT License — 자유롭게 사용, 수정, 배포 가능
 ---
 
 **Last Updated**: 2026-06-26  
-**Version**: 0.4.0 (Phase 3 Complete)  
+**Version**: 0.5.0-pre (Phase 3 Complete + Phase 4 Error Handling)  
 **GitHub**: https://github.com/cbpark84/vibe-flow

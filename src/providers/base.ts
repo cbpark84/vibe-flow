@@ -28,11 +28,14 @@ export interface Tool {
   description: string;
   inputSchema: {
     type: 'object';
-    properties: Record<string, {
-      type: string;
-      description?: string;
-      enum?: string[];
-    }>;
+    properties: Record<
+      string,
+      {
+        type: string;
+        description?: string;
+        enum?: string[];
+      }
+    >;
     required?: string[];
   };
 }
@@ -45,8 +48,8 @@ export interface Tool {
  * - ToolResultChunk: 도구 실행 결과를 LLM에게 피드백 (내부 처리용)
  */
 export type StreamChunk =
-  | { type: 'text';        content: string }
-  | { type: 'tool_use';   toolCallId: string; toolName: string; toolInput: Record<string, unknown> }
+  | { type: 'text'; content: string }
+  | { type: 'tool_use'; toolCallId: string; toolName: string; toolInput: Record<string, unknown> }
   | { type: 'tool_result'; toolCallId: string; content: string; isError: boolean };
 
 /**
@@ -80,7 +83,7 @@ export interface ILLMProvider {
   chat(
     messages: ChatMessage[],
     tools?: Tool[],
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): AsyncIterableIterator<StreamChunk>;
 
   /**

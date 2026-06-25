@@ -1,4 +1,5 @@
 import React from 'react';
+import DiffViewer from './DiffViewer';
 
 interface ToolApprovalProps {
   type: 'write_file' | 'run_terminal';
@@ -23,7 +24,7 @@ export default function ToolApproval({
   dangerReason,
   onApprove,
   onReject,
-}: ToolApprovalProps) {
+}: ToolApprovalProps): JSX.Element | null {
   if (type === 'write_file') {
     return (
       <div className="mb-4 border border-gray-400 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-900 p-4">
@@ -31,31 +32,9 @@ export default function ToolApproval({
           <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">
             {isNewFile ? 'Create File' : 'Modify File'}
           </span>
-          <div className="text-sm font-mono text-gray-700 dark:text-gray-300 mt-1">
-            {filePath}
-          </div>
         </div>
 
-        {diff && (
-          <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded font-mono text-xs mb-4 overflow-x-auto max-h-48 overflow-y-auto">
-            {diff.split('\n').map((line, idx) => {
-              let bgColor = '';
-              let textColor = '';
-              if (line.startsWith('+') && !line.startsWith('+++')) {
-                bgColor = 'bg-green-100 dark:bg-green-900';
-                textColor = 'text-green-900 dark:text-green-100';
-              } else if (line.startsWith('-') && !line.startsWith('---')) {
-                bgColor = 'bg-red-100 dark:bg-red-900';
-                textColor = 'text-red-900 dark:text-red-100';
-              }
-              return (
-                <div key={idx} className={`${bgColor} ${textColor} whitespace-pre-wrap break-words`}>
-                  {line}
-                </div>
-              );
-            })}
-          </div>
-        )}
+        {diff && <DiffViewer diff={diff} filePath={filePath ?? ''} isNewFile={isNewFile ?? false} />}
 
         <div className="flex gap-2">
           <button

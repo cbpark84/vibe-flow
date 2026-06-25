@@ -25,7 +25,7 @@ export class GeminiProvider implements ILLMProvider {
   async *chat(
     messages: ChatMessage[],
     tools: Tool[] = [],
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): AsyncIterableIterator<StreamChunk> {
     if (!this.client) throw new Error('GeminiProvider not initialized');
 
@@ -36,23 +36,27 @@ export class GeminiProvider implements ILLMProvider {
         // tool 결과: user role + functionResponse part
         contents.push({
           role: 'user',
-          parts: [{
-            functionResponse: {
-              name: msg.toolName ?? '',
-              response: { result: msg.content },
+          parts: [
+            {
+              functionResponse: {
+                name: msg.toolName ?? '',
+                response: { result: msg.content },
+              },
             },
-          }] as Part[],
+          ] as Part[],
         });
       } else if (msg.role === 'assistant' && msg.toolCallId) {
         // tool_use 블록: model role + functionCall part
         contents.push({
           role: 'model',
-          parts: [{
-            functionCall: {
-              name: msg.toolName ?? '',
-              args: msg.toolInput ?? {},
+          parts: [
+            {
+              functionCall: {
+                name: msg.toolName ?? '',
+                args: msg.toolInput ?? {},
+              },
             },
-          }] as Part[],
+          ] as Part[],
         });
       } else {
         contents.push({
@@ -63,22 +67,29 @@ export class GeminiProvider implements ILLMProvider {
     }
 
     // Tool[] → Gemini FunctionDeclaration[] 변환
-    const geminiTools = tools.length > 0 ? [{
-      functionDeclarations: tools.map((tool): FunctionDeclaration => ({
-        name: tool.name,
-        description: tool.description,
-        parameters: {
-          type: SchemaType.OBJECT,
-          properties: Object.fromEntries(
-            Object.entries(tool.inputSchema.properties).map(([k, v]) => [
-              k,
-              { type: v.type as SchemaType, description: v.description },
-            ])
-          ),
-          required: tool.inputSchema.required,
-        },
-      })),
-    }] : undefined;
+    const geminiTools =
+      tools.length > 0
+        ? [
+            {
+              functionDeclarations: tools.map(
+                (tool): FunctionDeclaration => ({
+                  name: tool.name,
+                  description: tool.description,
+                  parameters: {
+                    type: SchemaType.OBJECT,
+                    properties: Object.fromEntries(
+                      Object.entries(tool.inputSchema.properties).map(([k, v]) => [
+                        k,
+                        { type: v.type as SchemaType, description: v.description },
+                      ])
+                    ),
+                    required: tool.inputSchema.required,
+                  },
+                })
+              ),
+            },
+          ]
+        : undefined;
 
     const model = this.client.getGenerativeModel({
       model: 'gemini-1.5-pro',

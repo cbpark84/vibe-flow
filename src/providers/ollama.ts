@@ -33,18 +33,18 @@ export class OllamaProvider implements ILLMProvider {
   async *chat(
     messages: ChatMessage[],
     tools: Tool[] = [],
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): AsyncIterableIterator<StreamChunk> {
     // ChatMessage[] → Ollama 형식 변환
     const ollamaMessages: OllamaMessage[] = messages
-      .filter(msg => msg.role !== 'tool' || !msg.toolCallId) // tool_use 블록 제외
-      .map(msg => ({
+      .filter((msg) => msg.role !== 'tool' || !msg.toolCallId) // tool_use 블록 제외
+      .map((msg) => ({
         role: msg.role === 'assistant' ? 'assistant' : 'user',
         content: msg.content,
       }));
 
     // Tool[] → Ollama tools 형식
-    const ollamaTools = tools.map(tool => ({
+    const ollamaTools = tools.map((tool) => ({
       type: 'function',
       function: {
         name: tool.name,
@@ -69,7 +69,9 @@ export class OllamaProvider implements ILLMProvider {
     } catch (error) {
       const msg = (error as Error).message;
       if (msg.includes('ECONNREFUSED') || msg.includes('fetch failed')) {
-        throw new Error('Ollama가 실행 중이지 않습니다. 터미널에서 `ollama serve` 명령으로 시작하세요.');
+        throw new Error(
+          'Ollama가 실행 중이지 않습니다. 터미널에서 `ollama serve` 명령으로 시작하세요.'
+        );
       }
       throw error;
     }

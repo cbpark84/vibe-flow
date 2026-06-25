@@ -6,11 +6,13 @@ import { createProvider } from './providers/factory';
 import { initializeSecretStorage, getSecret, setSecret } from './utils/secretStorage';
 import { getLogger } from './utils/logger';
 import { ContextManager } from './utils/contextManager';
+import { parseProviderError } from './utils/errorHandler';
 import {
   WebviewToExtMessage,
   ExtensionToWebviewMessage,
   ProviderInfo,
 } from './utils/types';
+import { getWorkspaceConfig, onWorkspaceConfigChange, WorkspaceConfig } from './utils/workspaceConfig';
 import * as fileSystem from './tools/fileSystem';
 import * as terminal from './tools/terminal';
 
@@ -26,6 +28,9 @@ const HISTORY_STATE_KEY = 'vibeflow.conversationHistory';
 
 // Phase 2: 현재 활성 프로바이더 키 (기본값: 'claude')
 let activeProviderKey = 'claude';
+
+// Phase 4: 워크스페이스 설정
+let workspaceConfig: WorkspaceConfig = getWorkspaceConfig();
 
 const PROVIDER_LIST: ProviderInfo[] = [
   { key: 'claude', displayName: 'Claude', modelName: 'claude-opus-4-5', requiresApiKey: true },
@@ -114,6 +119,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     logger.info(`Restored ${savedHistory.length} messages from history`);
   }
 
+  // Phase 4: 워크스페이스 설정 변경 리스너 등록
+  const configChangeListener = onWorkspaceConfigChange((newConfig) => {
+    workspaceConfig = newConfig;
+    // WebView가 열려 있으면 설정 변경 알림
+    if (panel) {
+      sendMessage({
+        type: 'workspace_config_changed',
+        payload: newConfig,
+      });
+    }
+  });
+  context.subscriptions.push(configChangeListener);
+
   context.subscriptions.push(
     vscode.commands.registerCommand('vibeflow.openChat', async () => {
       await openChatPanel(context);
@@ -166,6 +184,12 @@ async function openChatPanel(context: vscode.ExtensionContext): Promise<void> {
   );
 
   panel.webview.html = getWebviewContent(context, panel.webview);
+
+  // Phase 4: 초기 워크스페이스 설정 전송
+  panel.webview.postMessage({
+    type: 'workspace_config_init',
+    payload: workspaceConfig,
+  });
 
   panel.webview.onDidReceiveMessage(
     async (message: WebviewToExtMessage) => {
@@ -257,6 +281,11 @@ async function handleWebviewMessage(message: WebviewToExtMessage): Promise<void>
         sendMessage({ type: 'history_cleared' });
         break;
       }
+      case 'open_settings': {
+        // Phase 4: VSCode 설정 패널 열기
+        await vscode.commands.executeCommand('workbench.action.openSettings', 'vibeflow');
+        break;
+      }
     }
   } catch (error) {
     logger.error(error as Error);
@@ -297,9 +326,24 @@ async function handleChatSend(userMessage: string): Promise<void> {
     const signal = abortController.signal;
 
     // Tool use loop: keep calling Claude until no more tools are requested
+    const MAX_TOOL_ITERATIONS = 10;
+    let toolIteration = 0;
     let shouldContinue = true;
     while (shouldContinue) {
       if (signal.aborted) break;
+
+      if (toolIteration >= MAX_TOOL_ITERATIONS) {
+        sendMessage({
+          type: 'stream_error',
+          payload: {
+            message: '⚠️ 도구 실행 횟수 한도(10회)에 도달했습니다. 요청을 더 구체적으로 작성해 주세요.',
+            errorType: 'tool_loop',
+            retryable: false,
+          },
+        });
+        break;
+      }
+      toolIteration++;
 
       const pendingToolCalls: Array<{
         toolCallId: string;
@@ -384,12 +428,44 @@ async function handleChatSend(userMessage: string): Promise<void> {
 
     sendMessage({ type: 'stream_end' });
   } catch (error) {
-    const msg = (error as Error).message;
-    if (msg === 'Aborted') {
-      sendMessage({ type: 'stream_error', payload: { message: 'Chat cancelled by user' } });
+    // 공식 Anthropic 패턴: APIUserAbortError는 정상적인 취소
+    // WebView에 에러로 표시하지 않음 (사용자의 의도적인 취소이므로)
+    if (error instanceof Error) {
+      if (error.message === 'Aborted') {
+        // 정상 취소 — 에러 메시지 없이 반환
+        logger.info('Chat cancelled by user');
+        sendMessage({ type: 'stream_end' });
+      } else {
+        // 실제 에러 발생
+        const providerName = provider?.name?.toLowerCase() ?? 'unknown';
+        const appError = parseProviderError(error, providerName);
+
+        logger.error(`Chat error [${appError.type}]: ${appError.detail ?? appError.message}`);
+
+        sendMessage({
+          type: 'stream_error',
+          payload: {
+            message: appError.message,
+            errorType: appError.type,
+            retryable: appError.retryable,
+          },
+        });
+      }
     } else {
-      logger.error(error as Error);
-      sendMessage({ type: 'stream_error', payload: { message: `Error: ${msg}` } });
+      // 비표준 에러 처리
+      const providerName = provider?.name?.toLowerCase() ?? 'unknown';
+      const appError = parseProviderError(error, providerName);
+
+      logger.error(`Chat error [${appError.type}]: ${appError.detail ?? appError.message}`);
+
+      sendMessage({
+        type: 'stream_error',
+        payload: {
+          message: appError.message,
+          errorType: appError.type,
+          retryable: appError.retryable,
+        },
+      });
     }
   } finally {
     // Clean up abort controller after streaming completes

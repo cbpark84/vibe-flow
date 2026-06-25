@@ -18,12 +18,12 @@ export class OpenAIProvider implements ILLMProvider {
   async *chat(
     messages: ChatMessage[],
     tools: Tool[] = [],
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): AsyncIterableIterator<StreamChunk> {
     if (!this.client) throw new Error('OpenAIProvider not initialized');
 
     // ChatMessage[] → OpenAI 형식 변환
-    const oaiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = messages.map(msg => {
+    const oaiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = messages.map((msg) => {
       if (msg.role === 'tool') {
         return {
           role: 'tool' as const,
@@ -55,7 +55,7 @@ export class OpenAIProvider implements ILLMProvider {
     });
 
     // Tool[] → OpenAI ChatCompletionTool[] 변환
-    const oaiTools: OpenAI.Chat.ChatCompletionTool[] = tools.map(tool => ({
+    const oaiTools: OpenAI.Chat.ChatCompletionTool[] = tools.map((tool) => ({
       type: 'function' as const,
       function: {
         name: tool.name,
@@ -64,12 +64,15 @@ export class OpenAIProvider implements ILLMProvider {
       },
     }));
 
-    const stream = await this.client.chat.completions.create({
-      model: 'gpt-4o',
-      messages: oaiMessages,
-      tools: oaiTools.length > 0 ? oaiTools : undefined,
-      stream: true,
-    }, { signal });
+    const stream = await this.client.chat.completions.create(
+      {
+        model: 'gpt-4o',
+        messages: oaiMessages,
+        tools: oaiTools.length > 0 ? oaiTools : undefined,
+        stream: true,
+      },
+      { signal }
+    );
 
     // tool_calls 조각 누적용 Map
     const toolCallBuffers = new Map<number, { id: string; name: string; args: string }>();
@@ -107,7 +110,9 @@ export class OpenAIProvider implements ILLMProvider {
           let toolInput: Record<string, unknown> = {};
           try {
             toolInput = JSON.parse(buf.args) as Record<string, unknown>;
-          } catch { /* 빈 input */ }
+          } catch {
+            /* 빈 input */
+          }
 
           yield {
             type: 'tool_use',

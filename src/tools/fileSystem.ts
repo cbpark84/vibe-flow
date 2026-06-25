@@ -10,10 +10,7 @@ interface ApprovalRequest {
 
 const pendingApprovals = new Map<string, ApprovalRequest>();
 
-export async function handleApproveWriteFile(
-  requestId: string,
-  approved: boolean
-): Promise<void> {
+export async function handleApproveWriteFile(requestId: string, approved: boolean): Promise<void> {
   const approval = pendingApprovals.get(requestId);
   if (approval) {
     approval.resolve(approved);
@@ -113,7 +110,7 @@ export async function listDirectory(dirPath: string): Promise<string[]> {
     }
 
     const entries = await fs.readdir(resolvedPath, { withFileTypes: true });
-    return entries.map(entry => {
+    return entries.map((entry) => {
       const type = entry.isDirectory() ? 'dir' : 'file';
       return `${type}: ${entry.name}`;
     });
