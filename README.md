@@ -13,7 +13,10 @@
 - **터미널 실행** - 쉘 명령 실행 (위험 명령어 자동 차단 + 사용자 승인)
 - **API 키 보안 저장** - VSCode SecretStorage에서 암호화 저장 (코드/파일에 절대 저장 안 함)
 - **스트리밍 응답** - 실시간으로 AI 응답 스트리밍
-- **멀티 프로바이더 준비** - 현재 Claude, 향후 OpenAI/Gemini/Ollama 지원 예정
+- **디렉토리 탐색** - 프로젝트 구조 파악 (list_directory)
+- **코드 검색** - 정규식으로 워크스페이스 전체 검색 (search_code)
+- **채팅 히스토리 자동 저장** - VSCode 재시작해도 대화 내역 유지
+- **멀티 프로바이더** - Claude, OpenAI, Gemini, Ollama 지원
 
 ## Requirements
 
@@ -65,6 +68,9 @@ Claude API 키를 입력하면 VSCode의 보안 저장소에 저장됩니다.
 "package.json에 lodash 의존성 추가해줘"
 "npm install 실행해줄 수 있어?"
 "이 함수의 버그를 고쳐줘" (파일 내용 함께 제공)
+"이 프로젝트 구조 보여줘" (list_directory로 디렉토리 탐색)
+"useState 쓰는 파일 찾아줘" (search_code로 정규식 검색)
+"ILLMProvider 인터페이스 어디 있어?" (search_code로 코드 검색)
 ```
 
 ## How It Works
@@ -114,6 +120,16 @@ Vibe Flow가 제공하는 AI 도구:
 | `read_file` | 파일 내용 읽기 | 아니오 |
 | `write_file` | 파일 생성/수정 | **예** (diff 미리보기) |
 | `run_terminal` | 쉘 명령 실행 | **예** (위험 패턴 감지) |
+| `list_directory` | 디렉토리 구조 탐색 | 아니오 |
+| `search_code` | 정규식으로 코드 검색 | 아니오 |
+
+## Commands
+
+| 커맨드 | 설명 |
+|--------|------|
+| `Vibe Flow: Open Chat` | 채팅 패널 열기 |
+| `Vibe Flow: Set API Key` | API 키 설정 |
+| `Vibe Flow: Clear History` | 채팅 히스토리 초기화 |
 
 ## Security
 
@@ -230,12 +246,14 @@ README.md (이 파일)
 
 ## Roadmap
 
-| Phase | 목표 | 상태 | 예상 완료 |
-|-------|------|------|---------|
-| **1** | MVP: Claude + 파일 + 터미널 | ✅ 완료 | 2026-06-24 |
-| **2** | 멀티 프로바이더 (OpenAI, Gemini, Ollama) | 🔜 예정 | 2026-07-08 |
-| **3** | 고급 기능 (list_directory, search_code, 히스토리) | 🔜 예정 | 2026-07-22 |
-| **4** | VSCode 마켓플레이스 배포 | 🔜 예정 | 2026-08-05 |
+- **Phase 1** ✅ MVP (Claude + 파일 + 터미널)
+- **Phase 2** ✅ 멀티 프로바이더 (OpenAI, Gemini, Ollama)
+- **Phase 3** 🔄 고급 기능 (진행 중)
+  - ✅ list_directory, search_code
+  - ✅ 채팅 히스토리 저장/로드
+  - ⏳ 컨텍스트 윈도우 관리
+  - ⏳ Diff UI 개선
+- **Phase 4** 🔜 VSCode 마켓플레이스 배포
 
 ## Troubleshooting
 
@@ -288,5 +306,5 @@ MIT License - 자유롭게 사용, 수정, 배포 가능
 
 ---
 
-**Last Updated**: 2026-06-24  
-**Version**: 0.1.0 (Phase 1 MVP)
+**Last Updated**: 2026-06-25  
+**Version**: 0.3.0 (Phase 3 - Advanced Features)
