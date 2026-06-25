@@ -27,7 +27,16 @@
         {
           "id": "vibeflow-sidebar",
           "title": "Vibe Flow",
-          "icon": "$(comment-discussion)"
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "vibeflow-sidebar": [
+        {
+          "type": "webview",
+          "id": "vibeflow.chatView",
+          "name": "Chat"
         }
       ]
     },

@@ -63,11 +63,16 @@ VSCode 커맨드 팔레트 (Cmd+Shift+P / Ctrl+Shift+P):
 
 ### 2. 채팅 패널 열기
 
-사이드바의 **⚡ Vibe Flow** 아이콘 클릭, 또는:
+Activity Bar (VSCode 왼쪽 아이콘 바)의 **채팅 버블 아이콘**을 클릭하면 사이드바 안에 채팅 UI가 열립니다.
+
+또는 커맨드 팔레트:
 
 ```
 > Vibe Flow: Open Chat
 ```
+
+> **보조 사이드바 사용**: Activity Bar의 Vibe Flow 아이콘을 우클릭 → *"Move to Secondary Side Bar"* 선택,  
+> 또는 아이콘을 오른쪽 보조 사이드바로 드래그하면 보조 사이드바에서도 사용할 수 있습니다.
 
 ### 3. 프로바이더 선택
 
@@ -322,16 +327,24 @@ tsconfig.json
 - ✅ Diff UI 개선 (라인 번호, 헝크 헤더, 변경 통계 포함)
 - ✅ 워크스페이스별 설정 (defaultProvider, systemPrompt, maxTokensPerRequest)
 
-### Phase 4 진행 항목 (Step 1: 에러 처리 개선)
+### Phase 4 진행 항목 (Step 1: 에러 처리 개선 + UI)
 - ✅ Anthropic 공식 SDK 에러 타입 분류 및 사용자 친화적 메시지
 - ✅ retry-after 헤더 기반 레이트 리미트 대기 시간 계산
 - ✅ 요청 ID 로깅 (API 지원 티켓용)
 - ✅ Tool loop 최대 10회 제한 (무한 재시도 방지)
 - ✅ 승인 대기 2분 타임아웃 (write_file, run_terminal)
+- ✅ Activity Bar 아이콘 표시 (SVG 아이콘 + WebviewViewProvider 전환)
+- ✅ 보조 사이드바(Secondary Side Bar) 지원
 
 ---
 
 ## Troubleshooting
+
+### Activity Bar에 아이콘이 보이지 않음
+Extension Development Host(F5)로 실행 중인지 확인하세요. 이미 실행 중이라면:
+1. 커맨드 팔레트에서 `Developer: Reload Window` 실행
+2. Activity Bar에서 Vibe Flow 아이콘 확인
+3. 아이콘이 숨겨진 경우 Activity Bar 빈 공간 우클릭 → 목록에서 체크 확인
 
 ### "API 키를 등록하세요" 에러
 커맨드 팔레트: `Vibe Flow: Set API Key` → 프로바이더 선택 → API 키 입력
@@ -373,5 +386,5 @@ MIT License — 자유롭게 사용, 수정, 배포 가능
 ---
 
 **Last Updated**: 2026-06-26  
-**Version**: 0.5.0-pre (Phase 3 Complete + Phase 4 Error Handling)  
+**Version**: 0.5.1 (Sidebar WebviewViewProvider + Activity Bar Icon)  
 **GitHub**: https://github.com/cbpark84/vibe-flow

@@ -19,7 +19,6 @@ import * as terminal from './tools/terminal';
 const logger = getLogger('Extension');
 
 let provider: ILLMProvider | null = null;
-let panel: vscode.WebviewPanel | null = null;
 let abortController: AbortController | null = null;
 
 // Phase 3: ExtensionContext를 모듈 레벨에서 접근하기 위한 참조
@@ -31,6 +30,9 @@ let activeProviderKey = 'claude';
 
 // Phase 4: 워크스페이스 설정
 let workspaceConfig: WorkspaceConfig = getWorkspaceConfig();
+
+// WebviewViewProvider 참조 (sendMessage에서 사용)
+let viewProvider: VibeFlowViewProvider | null = null;
 
 const PROVIDER_LIST: ProviderInfo[] = [
   { key: 'claude', displayName: 'Claude', modelName: 'claude-opus-4-5', requiresApiKey: true },
@@ -104,6 +106,56 @@ const TOOLS: Tool[] = [
   },
 ];
 
+/**
+ * 사이드바 WebView 패널을 제공하는 Provider.
+ * VSCode Activity Bar 아이콘 클릭 시 resolveWebviewView가 호출된다.
+ * 보조 사이드바로 드래그해도 동일하게 동작한다.
+ */
+class VibeFlowViewProvider implements vscode.WebviewViewProvider {
+  public static readonly viewType = 'vibeflow.chatView';
+  private _view?: vscode.WebviewView;
+
+  constructor(private readonly context: vscode.ExtensionContext) {}
+
+  public resolveWebviewView(
+    webviewView: vscode.WebviewView,
+    _resolveContext: vscode.WebviewViewResolveContext,
+    _token: vscode.CancellationToken,
+  ): void {
+    this._view = webviewView;
+
+    // WebView 옵션: 스크립트 허용 + 리소스 루트 설정
+    webviewView.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [
+        vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview'),
+      ],
+    };
+
+    webviewView.webview.html = getWebviewContent(this.context, webviewView.webview);
+
+    // 초기 워크스페이스 설정 전송
+    webviewView.webview.postMessage({
+      type: 'workspace_config_init',
+      payload: workspaceConfig,
+    });
+
+    // WebView → Extension 메시지 수신
+    webviewView.webview.onDidReceiveMessage(
+      async (message: WebviewToExtMessage) => {
+        await handleWebviewMessage(message);
+      },
+      undefined,
+      this.context.subscriptions,
+    );
+  }
+
+  /** Extension → WebView 메시지 전송 */
+  public postMessage(message: ExtensionToWebviewMessage): void {
+    this._view?.webview.postMessage(message).catch((err: Error) => logger.error(err));
+  }
+}
+
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   logger.info('Activating Vibe Flow extension');
 
@@ -119,22 +171,33 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     logger.info(`Restored ${savedHistory.length} messages from history`);
   }
 
+  // WebviewViewProvider 등록 (사이드바 아이콘과 연결)
+  viewProvider = new VibeFlowViewProvider(context);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      VibeFlowViewProvider.viewType,
+      viewProvider,
+      {
+        // 사이드바가 숨겨져 있어도 WebView 상태를 유지
+        webviewOptions: { retainContextWhenHidden: true },
+      }
+    )
+  );
+
   // Phase 4: 워크스페이스 설정 변경 리스너 등록
   const configChangeListener = onWorkspaceConfigChange((newConfig) => {
     workspaceConfig = newConfig;
-    // WebView가 열려 있으면 설정 변경 알림
-    if (panel) {
-      sendMessage({
-        type: 'workspace_config_changed',
-        payload: newConfig,
-      });
-    }
+    sendMessage({
+      type: 'workspace_config_changed',
+      payload: newConfig,
+    });
   });
   context.subscriptions.push(configChangeListener);
 
+  // vibeflow.openChat: 사이드바 뷰 포커스
   context.subscriptions.push(
     vscode.commands.registerCommand('vibeflow.openChat', async () => {
-      await openChatPanel(context);
+      await vscode.commands.executeCommand('vibeflow.chatView.focus');
     })
   );
 
@@ -153,8 +216,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       vscode.window.showInformationMessage('Vibe Flow: 채팅 히스토리가 삭제되었습니다.');
     })
   );
-
-  await openChatPanel(context);
 }
 
 export async function deactivate(): Promise<void> {
@@ -162,50 +223,6 @@ export async function deactivate(): Promise<void> {
   if (abortController) {
     abortController.abort();
   }
-}
-
-async function openChatPanel(context: vscode.ExtensionContext): Promise<void> {
-  if (panel) {
-    panel.reveal(vscode.ViewColumn.Beside);
-    return;
-  }
-
-  panel = vscode.window.createWebviewPanel(
-    'vibeflow-chat',
-    'Vibe Flow Chat',
-    vscode.ViewColumn.Beside,
-    {
-      enableScripts: true,
-      enableForms: true,
-      localResourceRoots: [
-        vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview'),
-      ],
-    }
-  );
-
-  panel.webview.html = getWebviewContent(context, panel.webview);
-
-  // Phase 4: 초기 워크스페이스 설정 전송
-  panel.webview.postMessage({
-    type: 'workspace_config_init',
-    payload: workspaceConfig,
-  });
-
-  panel.webview.onDidReceiveMessage(
-    async (message: WebviewToExtMessage) => {
-      await handleWebviewMessage(message);
-    },
-    undefined,
-    context.subscriptions
-  );
-
-  panel.onDidDispose(() => {
-    panel = null;
-    if (abortController) {
-      abortController.abort();
-      abortController = null;
-    }
-  });
 }
 
 async function handleWebviewMessage(message: WebviewToExtMessage): Promise<void> {
@@ -296,7 +313,7 @@ async function handleWebviewMessage(message: WebviewToExtMessage): Promise<void>
   }
 }
 
-async function handleChatSend(userMessage: string): Promise<void> {
+async function handleChatSend(userMessage: string, _attachedFiles?: string[]): Promise<void> {
   try {
     // Initialize provider if needed
     if (!provider) {
@@ -356,17 +373,15 @@ async function handleChatSend(userMessage: string): Promise<void> {
       // Context window management: trim old exchanges if token limit exceeded
       const trimResult = await ContextManager.trim(conversationHistory, provider);
       if (trimResult.trimmed) {
-        // In-place update of conversationHistory
         conversationHistory.splice(0, conversationHistory.length, ...trimResult.messages);
         logger.info(`Context trimmed: removed ${trimResult.removedCount} messages`);
-        // Notify WebView (optional)
         sendMessage({
           type: 'stream_chunk',
           payload: { content: `\n_[컨텍스트 정리: ${trimResult.removedCount}개 오래된 메시지 제거됨]_\n` },
         });
       }
 
-      // Stream one turn from Claude
+      // Stream one turn from the LLM
       for await (const chunk of provider.chat(conversationHistory, TOOLS, signal)) {
         if (signal.aborted) break;
 
@@ -392,7 +407,6 @@ async function handleChatSend(userMessage: string): Promise<void> {
       // Save assistant text turn to history
       if (assistantTextBuffer) {
         conversationHistory.push({ role: 'assistant', content: assistantTextBuffer });
-        // Phase 3: 히스토리 저장
         await extensionContext?.globalState.update(HISTORY_STATE_KEY, conversationHistory);
       }
 
@@ -402,18 +416,18 @@ async function handleChatSend(userMessage: string): Promise<void> {
         break;
       }
 
-      // Save tool_use blocks as assistant messages (needed for Anthropic's message format)
+      // Save tool_use blocks as assistant messages
       for (const tc of pendingToolCalls) {
         conversationHistory.push({
           role: 'assistant',
-          content: '',          // text content empty — this is a tool_use block
+          content: '',
           toolCallId: tc.toolCallId,
           toolName: tc.toolName,
           toolInput: tc.toolInput,
         });
       }
 
-      // Execute all tools, collect results, and add to history
+      // Execute all tools and add results to history
       for (const toolCall of pendingToolCalls) {
         if (signal.aborted) break;
         const toolResultContent = await executeTool(toolCall, signal);
@@ -428,20 +442,14 @@ async function handleChatSend(userMessage: string): Promise<void> {
 
     sendMessage({ type: 'stream_end' });
   } catch (error) {
-    // 공식 Anthropic 패턴: APIUserAbortError는 정상적인 취소
-    // WebView에 에러로 표시하지 않음 (사용자의 의도적인 취소이므로)
     if (error instanceof Error) {
       if (error.message === 'Aborted') {
-        // 정상 취소 — 에러 메시지 없이 반환
         logger.info('Chat cancelled by user');
         sendMessage({ type: 'stream_end' });
       } else {
-        // 실제 에러 발생
         const providerName = provider?.name?.toLowerCase() ?? 'unknown';
         const appError = parseProviderError(error, providerName);
-
         logger.error(`Chat error [${appError.type}]: ${appError.detail ?? appError.message}`);
-
         sendMessage({
           type: 'stream_error',
           payload: {
@@ -452,12 +460,9 @@ async function handleChatSend(userMessage: string): Promise<void> {
         });
       }
     } else {
-      // 비표준 에러 처리
       const providerName = provider?.name?.toLowerCase() ?? 'unknown';
       const appError = parseProviderError(error, providerName);
-
       logger.error(`Chat error [${appError.type}]: ${appError.detail ?? appError.message}`);
-
       sendMessage({
         type: 'stream_error',
         payload: {
@@ -468,14 +473,12 @@ async function handleChatSend(userMessage: string): Promise<void> {
       });
     }
   } finally {
-    // Clean up abort controller after streaming completes
     abortController = null;
   }
 }
 
 /**
  * 도구를 실행하고 결과 문자열을 반환한다.
- * write_file과 run_terminal은 사용자 승인을 요구한다.
  */
 async function executeTool(
   toolCall: { toolCallId: string; toolName: string; toolInput: Record<string, unknown> },
@@ -584,7 +587,6 @@ async function handleSelectProvider(providerKey: string): Promise<void> {
   if (info.requiresApiKey) {
     const apiKey = await getSecret(`${providerKey}-api-key`);
     if (!apiKey) {
-      // 키 없음 → WebView에 알려서 키 입력 UI 트리거
       sendMessage({ type: 'api_key_status', payload: { provider: providerKey, exists: false } });
       return;
     }
@@ -610,26 +612,23 @@ async function setApiKeyCommand(): Promise<void> {
 
   if (apiKey) {
     await setSecret('claude-api-key', apiKey);
-    // Reset provider so it reinitializes with the new key
     provider = null;
     vscode.window.showInformationMessage('Claude API key saved successfully');
   }
 }
 
+/** Extension → WebView 메시지 전송 (viewProvider를 통해) */
 function sendMessage(message: ExtensionToWebviewMessage): void {
-  panel?.webview.postMessage(message).catch((err: Error) => logger.error(err));
+  viewProvider?.postMessage(message);
 }
 
 /**
  * 빌드된 WebView HTML을 읽어서 리소스 경로를 WebView URI로 교체한다.
- * - Vite 빌드 결과물: dist/webview/index.html + assets/
- * - 개발 중 빌드가 없을 경우 fallback HTML을 반환한다.
  */
 function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Webview): string {
   const htmlPath = path.join(context.extensionPath, 'dist', 'webview', 'index.html');
 
   if (!fs.existsSync(htmlPath)) {
-    // Fallback: 빌드 전 개발용 메시지
     return `<!DOCTYPE html>
 <html><body style="font-family:sans-serif;padding:2rem;color:#888;">
   <h2>⚡ Vibe Flow</h2>
@@ -639,14 +638,11 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 
   let html = fs.readFileSync(htmlPath, 'utf-8');
 
-  // Vite 출력의 asset 경로(./assets/)를 WebView URI로 교체
   const distWebviewUri = webview.asWebviewUri(
     vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview')
   );
 
-  // Replace relative asset references with webview URIs
   html = html.replace(/\s(src|href)="(\.\/)?assets\//g, ` $1="${distWebviewUri}/assets/`);
 
   return html;
 }
-
