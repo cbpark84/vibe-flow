@@ -16,6 +16,10 @@
       {
         "command": "vibeflow.setApiKey",
         "title": "Vibe Flow: Set API Key"
+      },
+      {
+        "command": "vibeflow.clearHistory",
+        "title": "Vibe Flow: Clear History"
       }
     ],
     "viewsContainers": {

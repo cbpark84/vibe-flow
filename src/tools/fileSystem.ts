@@ -121,3 +121,62 @@ export async function listDirectory(dirPath: string): Promise<string[]> {
     throw new Error(`Failed to list directory ${dirPath}: ${(error as Error).message}`);
   }
 }
+
+/**
+ * search_code 도구: 워크스페이스에서 정규식 패턴으로 코드를 검색한다.
+ * @param pattern - 검색할 정규식 또는 문자열
+ * @param include - 검색할 파일 glob 패턴 (예: '**\/*.ts', 기본값: 모든 파일)
+ * @param maxResults - 최대 결과 수 (기본값: 50)
+ */
+export async function searchCode(
+  pattern: string,
+  include: string = '**/*',
+  maxResults: number = 50
+): Promise<Array<{ file: string; line: number; text: string }>> {
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (!workspaceFolders || workspaceFolders.length === 0) {
+    throw new Error('워크스페이스가 열려 있지 않습니다.');
+  }
+
+  const workspaceRoot = workspaceFolders[0].uri.fsPath;
+  const results: Array<{ file: string; line: number; text: string }> = [];
+
+  let regex: RegExp;
+  try {
+    regex = new RegExp(pattern, 'i');
+  } catch {
+    // 정규식이 아니면 리터럴 문자열로 검색
+    regex = new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+  }
+
+  // glob으로 파일 목록 가져오기
+  const uris = await vscode.workspace.findFiles(include, '**/node_modules/**', maxResults * 10);
+
+  for (const uri of uris) {
+    if (results.length >= maxResults) break;
+
+    // 워크스페이스 외부 파일 제외
+    if (!uri.fsPath.startsWith(workspaceRoot)) continue;
+
+    let content: string;
+    try {
+      content = await fs.readFile(uri.fsPath, 'utf-8');
+    } catch {
+      continue;
+    }
+
+    const lines = content.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      if (regex.test(lines[i])) {
+        results.push({
+          file: path.relative(workspaceRoot, uri.fsPath),
+          line: i + 1,
+          text: lines[i].trim(),
+        });
+        if (results.length >= maxResults) break;
+      }
+    }
+  }
+
+  return results;
+}

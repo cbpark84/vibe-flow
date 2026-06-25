@@ -19,6 +19,10 @@ let provider: ILLMProvider | null = null;
 let panel: vscode.WebviewPanel | null = null;
 let abortController: AbortController | null = null;
 
+// Phase 3: ExtensionContext를 모듈 레벨에서 접근하기 위한 참조
+let extensionContext: vscode.ExtensionContext | null = null;
+const HISTORY_STATE_KEY = 'vibeflow.conversationHistory';
+
 // Phase 2: 현재 활성 프로바이더 키 (기본값: 'claude')
 let activeProviderKey = 'claude';
 
@@ -68,12 +72,46 @@ const TOOLS: Tool[] = [
       required: ['command'],
     },
   },
+  {
+    name: 'list_directory',
+    description: 'List files and subdirectories in a directory. Returns each entry prefixed with "file:" or "dir:".',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        dir_path: { type: 'string', description: 'Path to the directory to list' },
+      },
+      required: ['dir_path'],
+    },
+  },
+  {
+    name: 'search_code',
+    description: 'Search for a regex pattern across all files in the workspace. Returns matching lines with file path and line number.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pattern: { type: 'string', description: 'Regex or literal string to search for' },
+        include: { type: 'string', description: 'Glob pattern to filter files (e.g. "**/*.ts"). Defaults to all files.' },
+        max_results: { type: 'string', description: 'Maximum number of results to return (default: 50)' },
+      },
+      required: ['pattern'],
+    },
+  },
 ];
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   logger.info('Activating Vibe Flow extension');
 
   initializeSecretStorage(context.secrets);
+
+  // Phase 3: 컨텍스트 저장
+  extensionContext = context;
+
+  // Phase 3: 저장된 히스토리 복원
+  const savedHistory = context.globalState.get<ChatMessage[]>(HISTORY_STATE_KEY, []);
+  if (savedHistory.length > 0) {
+    conversationHistory.push(...savedHistory);
+    logger.info(`Restored ${savedHistory.length} messages from history`);
+  }
 
   context.subscriptions.push(
     vscode.commands.registerCommand('vibeflow.openChat', async () => {
@@ -84,6 +122,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(
     vscode.commands.registerCommand('vibeflow.setApiKey', async () => {
       await setApiKeyCommand();
+    })
+  );
+
+  // Phase 3: 히스토리 삭제 커맨드
+  context.subscriptions.push(
+    vscode.commands.registerCommand('vibeflow.clearHistory', async () => {
+      conversationHistory.length = 0;
+      await context.globalState.update(HISTORY_STATE_KEY, []);
+      sendMessage({ type: 'history_cleared' });
+      vscode.window.showInformationMessage('Vibe Flow: 채팅 히스토리가 삭제되었습니다.');
     })
   );
 
@@ -190,6 +238,24 @@ async function handleWebviewMessage(message: WebviewToExtMessage): Promise<void>
         });
         break;
       }
+      case 'get_history': {
+        // Phase 3: user/assistant 텍스트 메시지만 WebView 표시용으로 변환 (tool 블록 제외)
+        const displayMessages = conversationHistory
+          .filter(m =>
+            (m.role === 'user' || m.role === 'assistant') &&
+            !m.toolCallId &&
+            m.content.trim() !== ''
+          )
+          .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+        sendMessage({ type: 'history_loaded', payload: { messages: displayMessages } });
+        break;
+      }
+      case 'clear_history': {
+        conversationHistory.length = 0;
+        await extensionContext?.globalState.update(HISTORY_STATE_KEY, []);
+        sendMessage({ type: 'history_cleared' });
+        break;
+      }
     }
   } catch (error) {
     logger.error(error as Error);
@@ -222,6 +288,9 @@ async function handleChatSend(userMessage: string): Promise<void> {
 
     // Add user message to history
     conversationHistory.push({ role: 'user', content: userMessage });
+
+    // Phase 3: 히스토리 저장
+    await extensionContext?.globalState.update(HISTORY_STATE_KEY, conversationHistory);
 
     abortController = new AbortController();
     const signal = abortController.signal;
@@ -265,6 +334,8 @@ async function handleChatSend(userMessage: string): Promise<void> {
       // Save assistant text turn to history
       if (assistantTextBuffer) {
         conversationHistory.push({ role: 'assistant', content: assistantTextBuffer });
+        // Phase 3: 히스토리 저장
+        await extensionContext?.globalState.update(HISTORY_STATE_KEY, conversationHistory);
       }
 
       // No tools → conversation turn complete
@@ -387,6 +458,26 @@ async function executeTool(
     });
 
     return JSON.stringify(result);
+
+  } else if (toolName === 'list_directory') {
+    const dirPath = toolInput.dir_path as string;
+    try {
+      const entries = await fileSystem.listDirectory(dirPath);
+      return JSON.stringify({ success: true, entries });
+    } catch (error) {
+      return JSON.stringify({ success: false, error: (error as Error).message });
+    }
+
+  } else if (toolName === 'search_code') {
+    const pattern = toolInput.pattern as string;
+    const include = (toolInput.include as string | undefined) ?? '**/*';
+    const maxResults = parseInt((toolInput.max_results as string | undefined) ?? '50', 10);
+    try {
+      const results = await fileSystem.searchCode(pattern, include, maxResults);
+      return JSON.stringify({ success: true, results, count: results.length });
+    } catch (error) {
+      return JSON.stringify({ success: false, error: (error as Error).message });
+    }
 
   } else {
     return JSON.stringify({ success: false, error: `Unknown tool: ${toolName}` });

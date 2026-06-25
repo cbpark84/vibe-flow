@@ -184,7 +184,34 @@ export interface ExtMsg_ProviderList {
   payload: { providers: ProviderInfo[]; activeProvider: string };
 }
 
-/** 업데이트된 WebView → Extension 유니온 (Phase 2) */
+// ─────────────────────────────────────────────────────────────
+// Phase 3: 채팅 히스토리 관련 메시지
+// ─────────────────────────────────────────────────────────────
+
+/** WebView → Extension: 저장된 히스토리 요청 */
+export interface WVMsg_GetHistory {
+  type: 'get_history';
+}
+
+/** WebView → Extension: 히스토리 전체 삭제 요청 */
+export interface WVMsg_ClearHistory {
+  type: 'clear_history';
+}
+
+/** Extension → WebView: 저장된 히스토리 전달 (패널 열릴 때) */
+export interface ExtMsg_HistoryLoaded {
+  type: 'history_loaded';
+  payload: {
+    messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+  };
+}
+
+/** Extension → WebView: 히스토리 삭제 완료 */
+export interface ExtMsg_HistoryCleared {
+  type: 'history_cleared';
+}
+
+/** 업데이트된 WebView → Extension 유니온 (Phase 3) */
 export type WebviewToExtMessage =
   | WVMsg_SendChat
   | WVMsg_AbortStream
@@ -193,4 +220,21 @@ export type WebviewToExtMessage =
   | WVMsg_SaveApiKey
   | WVMsg_CheckApiKey
   | WVMsg_SelectProvider
-  | WVMsg_GetProviderList;
+  | WVMsg_GetProviderList
+  | WVMsg_GetHistory
+  | WVMsg_ClearHistory;
+
+/** 업데이트된 Extension → WebView 유니온 (Phase 3) */
+export type ExtensionToWebviewMessage =
+  | ExtMsg_StreamChunk
+  | ExtMsg_StreamEnd
+  | ExtMsg_StreamError
+  | ExtMsg_RequestWriteFile
+  | ExtMsg_RequestRunTerminal
+  | ExtMsg_ToolResult
+  | ExtMsg_ApiKeyStatus
+  | ExtMsg_Error
+  | ExtMsg_ProviderChanged
+  | ExtMsg_ProviderList
+  | ExtMsg_HistoryLoaded
+  | ExtMsg_HistoryCleared;

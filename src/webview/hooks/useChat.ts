@@ -22,9 +22,10 @@ export function useChat() {
   const [activeProvider, setActiveProvider] = useState<string>('claude');
   const vscode = useVSCode();
 
-  // 마운트 시 Extension에 프로바이더 목록 요청
+  // 마운트 시 Extension에 프로바이더 목록 및 히스토리 요청
   useEffect(() => {
     vscode.postMessage({ type: 'get_provider_list' });
+    vscode.postMessage({ type: 'get_history' }); // Phase 3: 히스토리 로드
   }, [vscode]);
 
   useEffect(() => {
@@ -146,6 +147,22 @@ export function useChat() {
           setActiveProvider(message.payload.provider);
           break;
         }
+        case 'history_loaded': {
+          // Phase 3: 저장된 히스토리 로드
+          setMessages(
+            message.payload.messages.map((m, i) => ({
+              id: `history-${i}`,
+              role: m.role,
+              content: m.content,
+            }))
+          );
+          break;
+        }
+        case 'history_cleared': {
+          // Phase 3: 히스토리 삭제됨
+          setMessages([]);
+          break;
+        }
       }
     };
 
@@ -206,6 +223,11 @@ export function useChat() {
     [vscode]
   );
 
+  const clearHistory = useCallback(() => {
+    // Phase 3: 히스토리 삭제 요청
+    vscode.postMessage({ type: 'clear_history' });
+  }, [vscode]);
+
   return {
     messages,
     isStreaming,
@@ -216,5 +238,6 @@ export function useChat() {
     providers,
     activeProvider,
     selectProvider,
+    clearHistory,
   };
 }
