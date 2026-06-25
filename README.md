@@ -8,28 +8,36 @@
 
 ## Features
 
-- **AI 채팅 인터페이스** - Claude와 자연어로 대화하면서 개발 작업 수행
-- **파일 읽기/쓰기** - AI가 파일을 읽고 수정하며, 사용자 승인 후 적용 (diff 미리보기)
-- **터미널 실행** - 쉘 명령 실행 (위험 명령어 자동 차단 + 사용자 승인)
-- **API 키 보안 저장** - VSCode SecretStorage에서 암호화 저장 (코드/파일에 절대 저장 안 함)
-- **스트리밍 응답** - 실시간으로 AI 응답 스트리밍
-- **디렉토리 탐색** - 프로젝트 구조 파악 (list_directory)
-- **코드 검색** - 정규식으로 워크스페이스 전체 검색 (search_code)
-- **채팅 히스토리 자동 저장** - VSCode 재시작해도 대화 내역 유지
-- **멀티 프로바이더** - Claude, OpenAI, Gemini, Ollama 지원
+- **멀티 프로바이더** — Claude, OpenAI(GPT-4o), Gemini, Ollama(로컬) 자유 전환
+- **AI 채팅 인터페이스** — 자연어로 대화하면서 개발 작업 수행
+- **파일 읽기/쓰기** — AI가 파일을 읽고 수정하며, diff 미리보기 후 사용자 승인
+- **터미널 실행** — 쉘 명령 실행 (위험 명령어 자동 감지 + 사용자 승인)
+- **디렉토리 탐색** — 프로젝트 구조 탐색 (`list_directory`)
+- **코드 검색** — 정규식으로 워크스페이스 전체 검색 (`search_code`)
+- **채팅 히스토리** — VSCode 재시작해도 대화 내역 유지, Clear 버튼으로 초기화
+- **스마트 컨텍스트 관리** — 프로바이더별 차등 임계값으로 할루시네이션 방지
+- **API 키 보안 저장** — VSCode SecretStorage 암호화 저장 (코드/파일에 절대 저장 안 함)
+
+---
 
 ## Requirements
 
 - **VSCode** 1.85 이상
 - **Node.js** 18 이상
-- **Claude API 키** ([Anthropic](https://console.anthropic.com)에서 발급)
+- **LLM API 키** (사용하는 프로바이더에 맞게 발급)
+  - Claude: [Anthropic Console](https://console.anthropic.com)
+  - OpenAI: [OpenAI Platform](https://platform.openai.com)
+  - Gemini: [Google AI Studio](https://aistudio.google.com)
+  - Ollama: API 키 불필요 (로컬 서버)
+
+---
 
 ## Installation (개발용)
 
 ```bash
 # 1. 저장소 클론
-git clone <repository-url>
-cd cc_플러그인_개발
+git clone https://github.com/cbpark84/vibe-flow.git
+cd vibe-flow
 
 # 2. 의존성 설치
 npm install
@@ -38,90 +46,91 @@ npm install
 npm run compile
 ```
 
+---
+
 ## Quick Start
 
 ### 1. API 키 설정
 
-VSCode 커맨드 팔레트를 열고 (Cmd+Shift+P 또는 Ctrl+Shift+P):
+VSCode 커맨드 팔레트 (Cmd+Shift+P / Ctrl+Shift+P):
 
 ```
 > Vibe Flow: Set API Key
 ```
 
-Claude API 키를 입력하면 VSCode의 보안 저장소에 저장됩니다.
+프로바이더를 선택하고 API 키를 입력합니다. VSCode 보안 저장소에 암호화 저장됩니다.
 
 ### 2. 채팅 패널 열기
 
-사이드바의 **Vibe Flow** 아이콘을 클릭하거나, 커맨드 팔레트에서:
+사이드바의 **⚡ Vibe Flow** 아이콘 클릭, 또는:
 
 ```
 > Vibe Flow: Open Chat
 ```
 
-### 3. 대화 시작
+### 3. 프로바이더 선택
 
-채팅창에서 자연어로 지시하면 AI가 파일을 읽고, 수정하고, 명령을 실행합니다.
+채팅 헤더의 드롭다운에서 원하는 AI 프로바이더를 선택합니다.
 
-**예시:**
+### 4. 대화 시작
+
 ```
 "src/index.ts 파일을 읽어줄 수 있어?"
 "package.json에 lodash 의존성 추가해줘"
 "npm install 실행해줄 수 있어?"
-"이 함수의 버그를 고쳐줘" (파일 내용 함께 제공)
-"이 프로젝트 구조 보여줘" (list_directory로 디렉토리 탐색)
-"useState 쓰는 파일 찾아줘" (search_code로 정규식 검색)
-"ILLMProvider 인터페이스 어디 있어?" (search_code로 코드 검색)
+"이 프로젝트 구조 보여줘"
+"useState 쓰는 파일 찾아줘"
+"ILLMProvider 인터페이스 어디 있어?"
 ```
+
+---
 
 ## How It Works
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ 1. 사용자 채팅 입력                                         │
+│ 1. 사용자 채팅 입력                                          │
 └────────────────────┬────────────────────────────────────────┘
                      │
 ┌────────────────────▼────────────────────────────────────────┐
-│ 2. Extension Host → Claude API (도구 정의 포함)            │
+│ 2. ContextManager — 토큰 초과 시 오래된 대화 자동 트림       │
 └────────────────────┬────────────────────────────────────────┘
                      │
 ┌────────────────────▼────────────────────────────────────────┐
-│ 3. Claude 응답 (텍스트 또는 도구 호출 요청)                │
+│ 3. Extension Host → LLM API (도구 정의 포함)                │
 └────────────────────┬────────────────────────────────────────┘
                      │
           ┌──────────┴──────────┐
           │                     │
-    ┌─────▼─────┐        ┌─────▼─────┐
-    │ 텍스트    │        │ 도구 호출 │
-    │ 스트리밍  │        │ (파일/터미널)
-    └─────┬─────┘        └─────┬─────┘
+    ┌─────▼─────┐        ┌─────▼──────┐
+    │ 텍스트    │        │ 도구 호출  │
+    │ 스트리밍  │        │(파일/터미널)│
+    └─────┬─────┘        └─────┬──────┘
           │                     │
           │            ┌────────▼────────┐
-          │            │ 사용자 승인?   │
+          │            │ 사용자 승인?    │
           │            │ (미리보기 제시) │
           │            └────────┬────────┘
-          │                     │
           └──────────┬──────────┘
                      │
 ┌────────────────────▼────────────────────────────────────────┐
-│ 4. WebView에 스트리밍 (postMessage)                       │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────────┐
-│ 5. 사용자 화면에 실시간 표시                               │
+│ 4. WebView에 스트리밍 (postMessage)                         │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 도구 (Tools)
+---
 
-Vibe Flow가 제공하는 AI 도구:
+## Tools
 
 | 도구 | 설명 | 승인 필요 |
 |------|------|---------|
 | `read_file` | 파일 내용 읽기 | 아니오 |
-| `write_file` | 파일 생성/수정 | **예** (diff 미리보기) |
+| `write_file` | 파일 생성/수정 (diff 미리보기) | **예** |
 | `run_terminal` | 쉘 명령 실행 | **예** (위험 패턴 감지) |
 | `list_directory` | 디렉토리 구조 탐색 | 아니오 |
 | `search_code` | 정규식으로 코드 검색 | 아니오 |
+
+---
 
 ## Commands
 
@@ -131,31 +140,62 @@ Vibe Flow가 제공하는 AI 도구:
 | `Vibe Flow: Set API Key` | API 키 설정 |
 | `Vibe Flow: Clear History` | 채팅 히스토리 초기화 |
 
+---
+
+## Settings
+
+VSCode `Settings`에서 `Vibe Flow > Context`를 검색하면 프로바이더별 컨텍스트 임계값을 조절할 수 있습니다.
+
+| 설정 키 | 기본값 | 설명 |
+|---------|--------|------|
+| `vibeflow.context.claude.triggerPercent` | `70` | Claude: 트림 시작 임계값 (%) |
+| `vibeflow.context.claude.targetPercent` | `50` | Claude: 트림 후 목표 사용률 (%) |
+| `vibeflow.context.openai.triggerPercent` | `65` | OpenAI: 트림 시작 임계값 (%) |
+| `vibeflow.context.openai.targetPercent` | `45` | OpenAI: 트림 후 목표 사용률 (%) |
+| `vibeflow.context.gemini.triggerPercent` | `75` | Gemini: 트림 시작 임계값 (%) |
+| `vibeflow.context.gemini.targetPercent` | `55` | Gemini: 트림 후 목표 사용률 (%) |
+| `vibeflow.context.ollama.triggerPercent` | `50` | Ollama: 트림 시작 임계값 (%) |
+| `vibeflow.context.ollama.targetPercent` | `30` | Ollama: 트림 후 목표 사용률 (%) |
+
+> **팁**: `triggerPercent`는 항상 `targetPercent`보다 높게 설정하세요.  
+> Ollama는 32k 소용량 모델이므로 기본값이 낮게 설정되어 있습니다.
+
+### 프로바이더별 기본 임계값 설계 이유
+
+| 프로바이더 | 컨텍스트 크기 | Trigger | Target | 이유 |
+|-----------|-------------|---------|--------|------|
+| Claude | 200,000 토큰 | 70% | 50% | 대용량, 여유 있음 |
+| OpenAI | 128,000 토큰 | 65% | 45% | 중간 크기 |
+| Gemini | 1,000,000 토큰 | 75% | 55% | 초대용량, 가장 여유 |
+| Ollama | 32,000 토큰 | 50% | 30% | 소용량, 조기 정리 필수 |
+
+---
+
 ## Security
 
 ### API 키 보안
-
 - **저장 위치**: VSCode SecretStorage (OS 자격증명 관리자 암호화)
 - **코드에 절대 저장 안 함**: 설정 파일이나 소스 코드에 평문 저장 금지
 - **읽기 시점**: 채팅 시작 시에만 메모리에 로드
 
-### 위험 명령어 차단 (DANGEROUS_PATTERNS)
+### 위험 명령어 자동 감지 (DANGEROUS_PATTERNS)
 
-터미널 실행 요청 시 다음 패턴 자동 감지 및 사용자에게 경고:
+터미널 실행 요청 시 다음 패턴 자동 감지 → 사용자에게 경고 표시:
 
-- `rm -rf /`, `rm -rf ~`: 루트/홈 하위 재귀 삭제
-- `rm -rf *`: 와일드카드 재귀 삭제
+- `rm -rf /`, `rm -rf ~`, `rm -rf *`: 재귀 삭제
 - `sudo`, `su`: 관리자 권한 실행
-- `chmod 777`, `chown root`: 과도한 권한 부여
+- `chmod 777`, `chown root`: 과도한 권한
 - `mkfs.`, `dd if=`: 파일시스템/블록 디바이스 작업
 - `curl|sh`, `wget|sh`: 원격 스크립트 즉시 실행
 - Fork bomb (`:() { :|:& };:`): 프로세스 폭탄
-- `shutdown`, `reboot`, `halt`: 시스템 종료/재시작
+- `shutdown`, `reboot`, `halt`: 시스템 종료
 - `pkill`, `killall -9`: 강제 프로세스 종료
 - `npm publish`: 패키지 공개 배포
 - `git push --force`: 강제 푸시
 
 **모든 위험 명령어는 사용자 승인 후에만 실행됩니다.**
+
+---
 
 ## Development
 
@@ -179,14 +219,8 @@ npm run watch:web     # WebView
 ### 린팅 및 포매팅
 
 ```bash
-# ESLint 검사
-npm run lint
-
-# Prettier 자동 포매팅
-npm run format
-
-# 함께 실행
-npm run compile && npm run lint && npm run format
+npm run lint       # ESLint 검사
+npm run format     # Prettier 자동 포매팅
 ```
 
 ### F5 디버그 실행
@@ -206,105 +240,110 @@ dist/
     └── assets/           # JS, CSS 번들
 ```
 
+---
+
 ## Project Structure
 
 ```
 src/
 ├── extension.ts                    # Extension Host 진입점
-│   └── TOOLS 배열, 도구 실행, postMessage 처리
+│                                   #   (TOOLS 배열, 도구 실행, postMessage 처리)
 ├── providers/
-│   ├── base.ts                     # ILLMProvider 인터페이스
-│   ├── claude.ts                   # Claude 프로바이더
+│   ├── base.ts                     # ILLMProvider 인터페이스 + 공용 타입
+│   ├── claude.ts                   # Claude 프로바이더 (Anthropic SDK)
+│   ├── openai.ts                   # OpenAI 프로바이더 (GPT-4o)
+│   ├── gemini.ts                   # Gemini 프로바이더 (gemini-1.5-pro)
+│   ├── ollama.ts                   # Ollama 프로바이더 (로컬, API 키 불필요)
 │   └── factory.ts                  # 프로바이더 팩토리
 ├── tools/
-│   ├── fileSystem.ts               # 파일 읽기/쓰기 도구
-│   ├── terminal.ts                 # 터미널 실행 도구 (위험 패턴 차단)
-│   └── types.ts                    # 도구 타입 정의
+│   ├── fileSystem.ts               # read_file, write_file, list_directory, search_code
+│   └── terminal.ts                 # run_terminal (위험 패턴 차단)
 ├── webview/
 │   ├── main.tsx                    # React 진입점
 │   ├── App.tsx                     # 메인 채팅 UI
 │   ├── components/
 │   │   ├── ChatPanel.tsx           # 채팅 인터페이스
+│   │   ├── InputBar.tsx            # 입력창 + 전송/취소 버튼
 │   │   ├── MessageBubble.tsx       # 메시지 버블
+│   │   ├── ProviderSelector.tsx    # 프로바이더 선택 드롭다운
 │   │   └── ToolApproval.tsx        # 파일/터미널 승인 UI
 │   └── hooks/
-│       ├── useChat.ts              # 채팅 로직
-│       └── useVSCode.ts            # VSCode API 접근
+│       ├── useChat.ts              # 채팅 상태 & 메시지 처리
+│       └── useVSCode.ts            # VSCode postMessage API 래퍼
 └── utils/
-    ├── secretStorage.ts            # API 키 보안 저장
-    ├── contextManager.ts           # 토큰 관리
+    ├── contextManager.ts           # 토큰 관리 (프로바이더별 차등 임계값)
+    ├── secretStorage.ts            # API 키 보안 저장/조회
     ├── logger.ts                   # VSCode OutputChannel 래퍼
-    └── types.ts                    # 공용 타입
+    └── types.ts                    # WebView ↔ Extension 메시지 타입
 
-test/                                # Extension 테스트
-esbuild.config.js                    # Extension 빌드 설정
-vite.config.ts                       # WebView 빌드 설정
+esbuild.config.js                   # Extension 빌드 설정
+vite.config.ts                      # WebView 빌드 설정
 package.json
 tsconfig.json
-README.md (이 파일)
 ```
+
+---
 
 ## Roadmap
 
-- **Phase 1** ✅ MVP (Claude + 파일 + 터미널)
-- **Phase 2** ✅ 멀티 프로바이더 (OpenAI, Gemini, Ollama)
-- **Phase 3** 🔄 고급 기능 (진행 중)
-  - ✅ list_directory, search_code
-  - ✅ 채팅 히스토리 저장/로드
-  - ⏳ 컨텍스트 윈도우 관리
-  - ⏳ Diff UI 개선
-- **Phase 4** 🔜 VSCode 마켓플레이스 배포
+| Phase | 상태 | 내용 |
+|-------|------|------|
+| **Phase 1** | ✅ 완료 | MVP — Claude + 파일 + 터미널 |
+| **Phase 2** | ✅ 완료 | 멀티 프로바이더 (OpenAI, Gemini, Ollama) |
+| **Phase 3** | ✅ 완료 | 고급 기능 (탐색/검색, 히스토리, 컨텍스트 관리) |
+| **Phase 4** | 🔜 예정 | VSCode 마켓플레이스 배포 |
+
+### Phase 3 세부 완료 항목
+- ✅ `list_directory` — 디렉토리 구조 탐색
+- ✅ `search_code` — 정규식 코드 검색
+- ✅ 채팅 히스토리 저장/로드 (VSCode globalState)
+- ✅ 컨텍스트 윈도우 관리 (exchange 단위 트림, 프로바이더별 차등 임계값)
+- ⏳ Diff UI 개선 (Phase 4로 이동)
+- ⏳ 워크스페이스별 설정 (Phase 4로 이동)
+
+---
 
 ## Troubleshooting
 
-### "Claude API 키를 등록하세요" 에러
+### "API 키를 등록하세요" 에러
+커맨드 팔레트: `Vibe Flow: Set API Key` → 프로바이더 선택 → API 키 입력
 
-1. 커맨드 팔레트 (Cmd+Shift+P): `> Vibe Flow: Set API Key`
-2. [Anthropic Console](https://console.anthropic.com)에서 API 키 발급
-3. 키 입력 후 엔터
+### Ollama 연결 안 됨
+터미널에서 Ollama 서버 실행:
+```bash
+ollama serve
+```
 
 ### "WebView 빌드가 필요합니다" 메시지
-
-WebView가 아직 빌드되지 않았습니다:
-
 ```bash
 npm run compile:web
 ```
 
-또는 개발 중 자동 빌드:
-
-```bash
-npm run watch:web
-```
-
 ### 파일을 읽을 수 없음
-
 - 절대 경로 또는 워크스페이스 상대 경로 사용
-- 파일 권한 확인 (읽기 권한 필요)
+- 파일 읽기 권한 확인
 
 ### 터미널 명령이 실행되지 않음
+- 채팅 UI의 "승인" 버튼 클릭 필요
+- 위험 패턴 감지 시 경고 표시 후 승인 필요
 
-- "승인" 버튼을 클릭했는지 확인
-- 위험 명령어 패턴은 자동으로 차단됨
-- 명령어 문법 확인
+---
 
 ## Contributing
 
-이 프로젝트의 개발 가이드:
-
+개발 가이드:
 - **PLAN.md**: 개발 로드맵 및 아키텍처
 - **AGENTS.md**: 코딩 컨벤션 및 에이전트 역할
 - **CLAUDE.md**: Claude AI 에이전트 전용 지침
 
+---
+
 ## License
 
-MIT License - 자유롭게 사용, 수정, 배포 가능
-
-## Contact
-
-문제나 제안: [GitHub Issues](https://github.com/your-repo/issues)
+MIT License — 자유롭게 사용, 수정, 배포 가능
 
 ---
 
-**Last Updated**: 2026-06-25  
-**Version**: 0.3.0 (Phase 3 - Advanced Features)
+**Last Updated**: 2026-06-26  
+**Version**: 0.4.0 (Phase 3 Complete)  
+**GitHub**: https://github.com/cbpark84/vibe-flow
