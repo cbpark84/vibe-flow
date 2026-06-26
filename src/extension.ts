@@ -263,6 +263,10 @@ async function handleWebviewMessage(message: WebviewToExtMessage): Promise<void>
       }
       case 'save_api_key': {
         await setSecret(`${message.payload.provider}-api-key`, message.payload.apiKey);
+        // Reset provider if active provider's key changed so new key takes effect on next chat
+        if (message.payload.provider === activeProviderKey) {
+          provider = null;
+        }
         sendMessage({
           type: 'api_key_status',
           payload: { provider: message.payload.provider, exists: true },
@@ -279,6 +283,10 @@ async function handleWebviewMessage(message: WebviewToExtMessage): Promise<void>
       }
       case 'delete_api_key': {
         await deleteSecret(`${message.payload.provider}-api-key`);
+        // Reset provider if active provider's key was deleted
+        if (message.payload.provider === activeProviderKey) {
+          provider = null;
+        }
         // 삭제 후 전체 상태 재확인해서 전송
         const status: Record<string, boolean> = {};
         for (const p of PROVIDER_LIST) {
