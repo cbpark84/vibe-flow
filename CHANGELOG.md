@@ -55,6 +55,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Error message-specific red-box UI with retryable hint
   - Improved tool status feedback
 
+#### Phase 4: Settings Panel — API Key Management & Per-Provider Token Control (2026-06-26)
+
+- **SettingsPanel 탭 리디자인** (`src/webview/components/SettingsPanel.tsx`):
+  - ⚙️ General / 🔑 API Keys 두 탭으로 분리
+  - API 키 미등록 프로바이더 선택 시 API Keys 탭 자동 오픈
+
+- **🔑 API Keys 탭**:
+  - Claude / OpenAI / Gemini: 등록 상태 배지(✅ / ⚠️), 비밀번호 입력, Save / Update / Delete
+  - Ollama: URL 입력, Refresh 버튼 → `GET /api/tags`로 모델 목록 로드, 모델 드롭다운 선택
+  - 입력 필드 `type="password"` — 키 값 노출 없음
+
+- **⚙️ General 탭 — 프로바이더별 Max Tokens 슬라이더**:
+  - Claude: 256 ~ 16,384 토큰 (기본값 4,096)
+  - OpenAI: 256 ~ 4,096 토큰 (기본값 2,048)
+  - Gemini: 256 ~ 8,192 토큰 (기본값 2,048)
+  - Ollama: 256 ~ 4,096 토큰 (기본값 2,048)
+  - 슬라이더 우측에 현재 값 표시, 추천값 안내
+
+- **WorkspaceConfig 확장** (`src/utils/workspaceConfig.ts`, `src/utils/types.ts`):
+  - `maxTokensPerRequest` 단일 값 → 프로바이더별 분리: `claudeMaxTokens`, `openaiMaxTokens`, `geminiMaxTokens`, `ollamaMaxTokens`
+  - Ollama 연결 설정 추가: `ollamaUrl` (기본값 `http://localhost:11434`), `ollamaModel` (기본값 `llama3.2`)
+
+- **Extension 메시지 핸들러 추가** (`src/extension.ts`):
+  - `delete_api_key`: SecretStorage에서 키 삭제, 전체 상태 응답
+  - `get_ollama_models`: Ollama REST API(`/api/tags`)로 설치된 모델 목록 조회
+  - `check_all_api_keys`: 모든 프로바이더 키 등록 상태 일괄 응답
+
+- **프로바이더 개선** (`src/providers/`):
+  - 모든 프로바이더 `chat()` 시그니처에 `options?: { maxTokens?: number }` 추가
+  - `claude.ts`: `max_tokens` 파라미터화 (기존 4096 하드코딩 → 설정값 사용)
+  - `openai.ts`: `max_tokens` 파라미터화
+  - `gemini.ts`: `maxOutputTokens` 파라미터화
+  - `ollama.ts`: `num_predict` 파라미터화, URL/모델 생성자 주입으로 변경 (기존 상수 → 동적 설정)
+  - `factory.ts`: `ProviderConfig` 인터페이스 추가, Ollama 생성 시 URL/모델 전달
+
 ### Changed
 
 - `ToolApproval.tsx`: Replaced basic +/- colored diff with `DiffViewer` component for structured diffs
@@ -69,6 +104,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tool loop infinite retry: Capped at 10 iterations to prevent API abuse
 - Missing error context: Now logs request_id for API debugging
 - Timeout handling: Explicit 60s timeout for Claude API calls (was implicit)
+- **API 키 변경 즉시 반영** (`src/extension.ts`):
+  - `save_api_key`: 활성 프로바이더 키 변경 시 `provider = null` 리셋 → 다음 채팅에 새 키 즉시 사용
+  - `delete_api_key`: 활성 프로바이더 키 삭제 시 `provider = null` 리셋 → 삭제가 즉시 반영
+  - 기존에는 VSCode 재시작 전까지 구 키가 메모리에 남아 계속 사용되는 버그 존재
 
 ---
 

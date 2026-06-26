@@ -242,7 +242,10 @@ vibe-flow/
 - [ ] 보안 감시 (API 키 노출 검사)
 - [ ] 성능 최적화 (번들 크기, 메모리)
 - [x] 에러 처리 및 사용자 메시지 개선 (Step 1: Anthropic 공식 에러 타입 분류)
-- [ ] SettingsPanel 인라인 에디터 (Workspace/Global 저장 토글, 직접 수정 가능)
+- [x] SettingsPanel 인라인 에디터 (Workspace/Global 저장 토글, 직접 수정 가능)
+- [x] SettingsPanel API Key 관리 탭 (프로바이더별 키 등록/삭제, Ollama URL+모델 선택)
+- [x] SettingsPanel General 탭: 프로바이더별 Max Tokens 슬라이더
+- [x] Ollama 모델 목록 자동 로드 (GET /api/tags)
 - [ ] 다국어 지원 (i18n)
 - [ ] CI/CD 파이프라인 구축
 - [ ] 마켓플레이스 README, 스크린샷, 설정 가이드
