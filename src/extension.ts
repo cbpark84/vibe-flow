@@ -623,7 +623,22 @@ function sendMessage(message: ExtensionToWebviewMessage): void {
 }
 
 /**
+ * 32자 랜덤 nonce 생성 (CSP 스크립트 허용용)
+ */
+function getNonce(): string {
+  let text = '';
+  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  for (let i = 0; i < 32; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text;
+}
+
+/**
  * 빌드된 WebView HTML을 읽어서 리소스 경로를 WebView URI로 교체한다.
+ * - 에셋 경로: /assets/, ./assets/, assets/ 모두 처리
+ * - CSP nonce: ${nonce} 플레이스홀더를 실제 nonce로 교체
+ * - script 태그에 nonce 속성 주입 (CSP 통과용)
  */
 function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Webview): string {
   const htmlPath = path.join(context.extensionPath, 'dist', 'webview', 'index.html');
@@ -638,11 +653,21 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 
   let html = fs.readFileSync(htmlPath, 'utf-8');
 
+  const nonce = getNonce();
+
   const distWebviewUri = webview.asWebviewUri(
     vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview')
   );
 
-  html = html.replace(/\s(src|href)="(\.\/)?assets\//g, ` $1="${distWebviewUri}/assets/`);
+  // 에셋 경로 교체: /assets/, ./assets/, assets/ 세 가지 패턴 모두 처리
+  html = html.replace(/(src|href)="(\.\/)?\/?assets\//g, `$1="${distWebviewUri}/assets/`);
+
+  // CSP nonce 플레이스홀더를 실제 nonce로 교체
+  html = html.replace(/\$\{nonce\}/g, nonce);
+
+  // 모든 <script> 태그에 nonce 속성 주입 (CSP nonce-xxx 정책 통과)
+  html = html.replace(/<script /g, `<script nonce="${nonce}" `);
+  html = html.replace(/<script>/g, `<script nonce="${nonce}">`);
 
   return html;
 }
