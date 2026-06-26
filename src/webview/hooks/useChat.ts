@@ -17,7 +17,18 @@ export interface ChatMessage {
   retryable?: boolean;
 }
 
-export function useChat() {
+export function useChat(): {
+  messages: ChatMessage[];
+  isStreaming: boolean;
+  sendMessage: (content: string) => void;
+  cancelStreaming: () => void;
+  approveWriteFile: (requestId: string, approved: boolean) => void;
+  approveRunTerminal: (requestId: string, approved: boolean) => void;
+  providers: ProviderInfo[];
+  activeProvider: string;
+  selectProvider: (key: string) => void;
+  clearHistory: () => void;
+} {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
@@ -31,7 +42,7 @@ export function useChat() {
   }, [vscode]);
 
   useEffect(() => {
-    const handleMessage = (event: MessageEvent<ExtensionToWebviewMessage>) => {
+    const handleMessage = (event: MessageEvent<ExtensionToWebviewMessage>): void => {
       const message = event.data;
 
       switch (message.type) {
@@ -192,7 +203,7 @@ export function useChat() {
     };
 
     window.addEventListener('message', handleMessage as EventListener);
-    return () => {
+    return (): void => {
       window.removeEventListener('message', handleMessage as EventListener);
     };
   }, [vscode]);

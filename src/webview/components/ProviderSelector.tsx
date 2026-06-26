@@ -17,7 +17,7 @@ export default function ProviderSelector({
   activeProvider,
   isStreaming,
   onSelect,
-}: ProviderSelectorProps) {
+}: ProviderSelectorProps): React.ReactElement {
   const active = providers.find(p => p.key === activeProvider);
 
   return (

@@ -67,7 +67,7 @@ export default function SettingsPanel({
   onDeleteApiKey,
   onGetOllamaModels,
   initialTab = 'general',
-}: SettingsPanelProps) {
+}: SettingsPanelProps): React.ReactElement | null {
   if (!config) {
     return null;
   }
@@ -90,12 +90,12 @@ export default function SettingsPanel({
   const [showKeyInput, setShowKeyInput] = useState<Record<string, boolean>>({});
   const [keyInputs, setKeyInputs] = useState<Record<string, string>>({});
 
-  const handleSave = () => {
+  const handleSave = (): void => {
     onSave(draft, saveTarget);
     onClose();
   };
 
-  const handleSaveApiKey = (provider: string) => {
+  const handleSaveApiKey = (provider: string): void => {
     const key = keyInputs[provider]?.trim();
     if (key) {
       onSaveApiKey(provider, key);
@@ -104,13 +104,13 @@ export default function SettingsPanel({
     }
   };
 
-  const handleDeleteApiKey = (provider: string) => {
+  const handleDeleteApiKey = (provider: string): void => {
     onDeleteApiKey(provider);
     setKeyInputs({ ...keyInputs, [provider]: '' });
     setShowKeyInput({ ...showKeyInput, [provider]: false });
   };
 
-  const handleRefreshOllamaModels = () => {
+  const handleRefreshOllamaModels = (): void => {
     const url = draft.ollamaUrl.trim();
     if (url) {
       onGetOllamaModels(url);
@@ -512,7 +512,7 @@ function ApiKeySection({
   onInputChange,
   onSave,
   onDelete,
-}: ApiKeySectionProps) {
+}: ApiKeySectionProps): React.ReactElement {
   const isConfigured = status === true;
 
   return (

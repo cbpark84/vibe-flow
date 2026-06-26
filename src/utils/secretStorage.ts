@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 
 let secretStorage: vscode.SecretStorage | null = null;
 
-export function initializeSecretStorage(storage: vscode.SecretStorage) {
+export function initializeSecretStorage(storage: vscode.SecretStorage): void {
   secretStorage = storage;
 }
 

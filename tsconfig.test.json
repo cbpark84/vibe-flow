@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
+    "outDir": "./out/test",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": ["src/test/**/*.ts", "src/tools/**/*.ts", "src/utils/errorHandler.ts", "src/providers/factory.ts"],
+  "exclude": ["node_modules", "src/webview", "src/utils/contextManager.ts", "src/utils/secretStorage.ts", "src/utils/workspaceConfig.ts", "src/extension.ts"]
+}

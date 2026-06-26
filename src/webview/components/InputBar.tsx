@@ -6,11 +6,11 @@ interface InputBarProps {
   isStreaming: boolean;
 }
 
-export default function InputBar({ onSend, onCancel, isStreaming }: InputBarProps) {
+export default function InputBar({ onSend, onCancel, isStreaming }: InputBarProps): React.ReactElement {
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if (input.trim()) {
@@ -23,7 +23,7 @@ export default function InputBar({ onSend, onCancel, isStreaming }: InputBarProp
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>): void => {
     setInput(e.target.value);
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';

@@ -125,6 +125,43 @@ interface ILLMProvider {
 | `search_code` | 정규식으로 코드 검색 | `src/tools/fileSystem.ts` |
 | `run_terminal` | 터미널 명령어 실행 | `src/tools/terminal.ts` |
 
+### 3.5 Ollama Agentic Layer (Phase 5)
+
+Ollama 프로바이더가 단순 채팅을 넘어 **Claude Code 수준의 에이전트 동작**을 수행하기 위한 계층.
+클라우드 LLM 대비 작은 컨텍스트 윈도우와 약한 추론 능력을 **마이크로 태스크 분해**와 **검증 루프**로 보완한다.
+
+**핵심 철학**: 빠른 한 번의 답변보다 검증된 100번의 작은 실행
+
+```
+사용자 요청
+↓
+[1] Project Understanding (프로젝트 구조 자동 탐색)
+     언어 / 패키지 매니저 / 빌드 / 테스트 / 아키텍처 감지
+↓
+[2] Task Planning (.ai/tasks/task_xxx.md 생성 및 승인)
+     목표 / 영향 파일 / 리스크 / 롤백 전략 포함
+↓
+[3] Micro Task Decomposition (함수 단위로 분해)
+     Large Goal → Feature → Component → Function → One Edit
+↓
+[4] Execute One Step (단일 함수/메서드만 수정)
+↓
+[5] Verify (컴파일 → 린트 → 단위 테스트 → Diff 리뷰)
+↓
+[6] Reflect (성공 여부 판단 → 플랜 갱신)
+↓
+[4]로 반복 또는 완료
+```
+
+**컨텍스트 최소화 전략**:
+- Knowledge Graph를 통해 관련 파일/함수만 선별 로드
+- 전체 저장소 로딩 금지 — 반드시 관련 파일만 Retrieve
+- 각 스텝은 독립 실행 가능한 단위로 분리
+
+**도구 정책**:
+- LLM이 도구를 직접 실행하지 않고 요청만 함
+- Extension Host가 권한 검증 후 실행 (기존 postMessage 패턴 재사용)
+
 ---
 
 ## 4. 예상 디렉토리 구조
@@ -164,6 +201,17 @@ vibe-flow/
 │       ├── secretStorage.ts         # 보안: API 키 저장/조회
 │       ├── logger.ts                # VSCode OutputChannel 래퍼
 │       └── types.ts                 # 공용 타입 정의
+│   └── agent/                           # Ollama Agentic Layer (Phase 5)
+│       ├── projectUnderstanding.ts      # 프로젝트 구조 탐색 파이프라인
+│       ├── taskPlanner.ts               # 태스크 플랜 생성/관리
+│       ├── microTaskDecomposer.ts       # 마이크로 태스크 분해 엔진
+│       ├── verifyLoop.ts                # 컴파일/린트/테스트 자동 검증
+│       ├── contextRetriever.ts          # Knowledge Graph 기반 파일 선별
+│       └── knowledgeGraph.ts            # 프로젝트 지식 그래프 빌더
+├── .ai/                                 # Ollama 에이전트 영구 메모리
+│   ├── tasks/                           # 태스크 플랜 파일 (task_xxx.md)
+│   ├── memory/                          # 프로젝트 요약, 아키텍처 메모
+│   └── knowledge/                       # Knowledge Graph (graph.json)
 ├── test/
 │   ├── suite/
 │   │   └── extension.test.ts        # Extension 테스트
@@ -238,7 +286,7 @@ vibe-flow/
 ### Phase 4: 마켓플레이스 배포 - Week 7-8
 **목표**: VSCode 마켓플레이스 정식 배포
 
-- [ ] 전체 기능 통합 테스트
+- [x] 전체 기능 통합 테스트 (31개 테스트 통과: terminal/filesystem/errorHandler/factory)
 - [ ] 보안 감시 (API 키 노출 검사)
 - [ ] 성능 최적화 (번들 크기, 메모리)
 - [x] 에러 처리 및 사용자 메시지 개선 (Step 1: Anthropic 공식 에러 타입 분류)
@@ -255,6 +303,64 @@ vibe-flow/
 **산출물**:
 - VSCode Marketplace 등록 완료
 - 정식 v1.0.0 릴리스
+
+---
+
+### Phase 5: Ollama Agentic Mode - Week 9-12
+**목표**: Ollama에서 Claude Code 수준의 자율 에이전트 동작 구현
+
+**설계 원칙 (Local LLM 특화)**:
+
+| 원칙 | 설명 |
+|------|------|
+| Explore First | 코드 수정 전 반드시 프로젝트 전체 탐색 |
+| Plan Before Code | 플랜 파일 생성 및 승인 없이 구현 불가 |
+| Micro Decomposition | 한 번에 하나의 함수만 수정 |
+| Verify Every Step | 각 수정 후 컴파일/린트/테스트 필수 |
+| Continuous Reflection | 각 도구 실행 후 플랜 유효성 재점검 |
+
+**구현 항목**:
+
+- [ ] **Project Understanding Pipeline**
+  - 언어/패키지 매니저/빌드 도구/테스트 프레임워크 자동 감지
+  - 폴더 트리 + 의존성 그래프 생성
+  - 진입점/아키텍처 패턴 감지
+  - 결과를 `.ai/memory/project_summary.md`에 영구 저장
+
+- [ ] **Knowledge Graph 생성**
+  - File → Class → Function → Call → Dependency → Test 그래프
+  - `.ai/knowledge/graph.json`에 저장
+  - 변경 시 자동 업데이트
+
+- [ ] **Task Planner**
+  - `.ai/tasks/task_xxx.md` 자동 생성
+  - 목표 / 영향 파일 / 필요 도구 / 리스크 / 검증 방법 / 롤백 전략 포함
+  - 사용자 승인 후 실행 시작
+
+- [ ] **Micro Task Decomposition 엔진**
+  - 큰 목표를 함수 단위 스텝으로 분해
+  - 각 스텝은 독립 실행 가능하도록 설계
+
+- [ ] **Context Retrieval**
+  - Knowledge Graph 기반 관련 파일/함수만 선별 로드
+  - 전체 저장소 로딩 방지
+
+- [ ] **Verify Loop 자동화**
+  - 각 편집 후 자동으로: 컴파일 → 린트 → 단위 테스트 → Diff 리뷰
+  - 실패 시: 롤백 → 재플랜 → 재시도
+
+- [ ] **Persistent Memory**
+  - `.ai/` 폴더에 프로젝트 컨텍스트 영구 저장
+  - 다음 세션에서 즉시 복원
+
+- [ ] **자동 문서 생성**
+  - `PROJECT.md`, `ARCHITECTURE.md`, `STYLE_GUIDE.md`, `MODULES.md` 자동 생성/갱신
+  - `.ai/tasks/TASK_HISTORY.md` 완료 태스크 이력 기록
+
+**산출물**:
+- Ollama 로컬 에이전트 동작 데모
+- `.ai/` 폴더 기반 프로젝트 메모리 시스템
+- 마이크로 태스크 분해 및 검증 루프 문서화
 
 ---
 
@@ -296,6 +402,39 @@ vibe-flow/
 - **메시지 흐름**: `save_workspace_config { config, target }` → Extension → `configuration.update(key, value, ConfigurationTarget)`
 - **자동 반영**: 저장 후 VSCode `onDidChangeConfiguration` 발화 → 기존 `workspace_config_changed` 메시지로 UI 자동 갱신
 - **"Open VSCode Settings" 버튼**: 유지 (직접 편집 외에 VSCode 네이티브 설정 UI 접근 경로 보존)
+
+### 6.6 Ollama Agentic Mode 설계 원칙 (Phase 5)
+
+**배경**: Ollama 로컬 모델은 클라우드 LLM 대비 컨텍스트 윈도우가 작고 추론 능력이 약함.
+이를 구조적으로 보완하기 위해 5가지 설계 원칙을 강제한다.
+
+**5가지 핵심 원칙**:
+
+1. **Explore First**
+   - 코드 수정 전 반드시 프로젝트 전체 구조를 탐색
+   - 폴더 구조 / 의존성 / 패턴 / 빌드 / 테스트 / 컨벤션 파악 완료 후에만 구현 가능
+
+2. **Planning Before Coding**
+   - 모든 구현 요청은 `.ai/tasks/task_xxx.md` 플랜 파일 생성으로 시작
+   - 플랜 미승인 시 구현 단계 진입 금지
+   - 플랜 포함 항목: 목표 / 영향 파일 / 필요 도구 / 리스크 / 검증 방법 / 롤백 전략
+
+3. **Micro Task Decomposition**
+   - 큰 목표를 **함수 단위**로 분해 (이상적으로는 한 스텝 = 한 함수 수정)
+   - 파일 전체 덮어쓰기 금지 → 함수 → 메서드 → 클래스 → 섹션 → 파일 순 선호
+   - "인증 구현" ❌ → "미들웨어 위치 파악 → 인터페이스 추가 → 단위 테스트 작성 → 함수 구현 → 검증" ✅
+
+4. **Plan → Execute → Verify Loop**
+   - 각 스텝 실행 후 반드시 검증: 컴파일 → 린트 → 단위 테스트 → Diff 리뷰
+   - 검증 실패 시: 롤백 → 재플랜 → 재시도 (다음 스텝 진입 금지)
+
+5. **Continuous Reflection**
+   - 각 도구 실행 후 3가지 질문:
+     - 이전 스텝이 성공했는가?
+     - 현재 플랜이 여전히 유효한가?
+     - 태스크를 더 작게 분해해야 하는가?
+
+**성공 지표**: 빠른 진행 ❌ / 검증된 진행 ✅
 
 ---
 
@@ -346,5 +485,5 @@ vibe-flow/
 ---
 
 **작성일**: 2026-06-26  
-**버전**: 1.4  
-**상태**: Phase 3 Complete, Phase 4 In Progress
+**버전**: 1.5  
+**상태**: Phase 3 Complete, Phase 4 In Progress, Phase 5 Planned

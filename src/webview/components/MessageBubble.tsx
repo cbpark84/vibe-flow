@@ -5,7 +5,7 @@ interface MessageBubbleProps {
   message: ChatMessage;
 }
 
-export default function MessageBubble({ message }: MessageBubbleProps) {
+export default function MessageBubble({ message }: MessageBubbleProps): React.ReactElement | null {
   if (message.role === 'user') {
     return (
       <div className="flex justify-end mb-4">

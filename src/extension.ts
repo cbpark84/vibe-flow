@@ -119,8 +119,6 @@ class VibeFlowViewProvider implements vscode.WebviewViewProvider {
 
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
-    _resolveContext: vscode.WebviewViewResolveContext,
-    _token: vscode.CancellationToken,
   ): void {
     this._view = webviewView;
 
@@ -396,7 +394,7 @@ async function handleWebviewMessage(message: WebviewToExtMessage): Promise<void>
   }
 }
 
-async function handleChatSend(userMessage: string, _attachedFiles?: string[]): Promise<void> {
+async function handleChatSend(userMessage: string): Promise<void> {
   try {
     // Initialize provider if needed
     if (!provider) {

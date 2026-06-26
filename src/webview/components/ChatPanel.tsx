@@ -13,7 +13,7 @@ export default function ChatPanel({
   messages,
   onApproveWriteFile,
   onApproveRunTerminal,
-}: ChatPanelProps) {
+}: ChatPanelProps): React.ReactElement {
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

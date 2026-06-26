@@ -31,7 +31,7 @@ export default function App(): React.ReactElement {
   const [ollamaModelsError, setOllamaModelsError] = useState<string | undefined>();
   const [settingsInitialTab, setSettingsInitialTab] = useState<'general' | 'apikeys'>('general');
 
-  React.useEffect(() => {
+  React.useEffect((): (() => void) => {
     const messageHandler = (event: MessageEvent): void => {
       const message = event.data;
 
@@ -51,7 +51,7 @@ export default function App(): React.ReactElement {
     // 마운트 후 즉시 요청 (WebView 리스너 등록 후 Extension에서 응답 → race condition 방지)
     vscode.postMessage({ type: 'get_workspace_config' });
     vscode.postMessage({ type: 'check_all_api_keys' });
-    return () => window.removeEventListener('message', messageHandler);
+    return (): void => window.removeEventListener('message', messageHandler);
   }, [vscode]);
 
   const handleSelectProvider = (providerKey: string): void => {
