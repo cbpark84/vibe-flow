@@ -242,6 +242,7 @@ vibe-flow/
 - [ ] 보안 감시 (API 키 노출 검사)
 - [ ] 성능 최적화 (번들 크기, 메모리)
 - [x] 에러 처리 및 사용자 메시지 개선 (Step 1: Anthropic 공식 에러 타입 분류)
+- [ ] SettingsPanel 인라인 에디터 (Workspace/Global 저장 토글, 직접 수정 가능)
 - [ ] 다국어 지원 (i18n)
 - [ ] CI/CD 파이프라인 구축
 - [ ] 마켓플레이스 README, 스크린샷, 설정 가이드
@@ -284,6 +285,13 @@ vibe-flow/
 - **파일 청킹**: 큰 파일은 청크 단위로 전달
 - **윈도우 슬라이딩**: 오래된 메시지부터 제거하되, 시스템 프롬프트는 항상 유지
 - **구현**: `src/utils/contextManager.ts`
+
+### 6.5 SettingsPanel 인라인 편집 (Phase 4 추가)
+- **변경**: 뷰어 전용 → 에디터 폼 (select, textarea, number input)
+- **저장 대상 선택**: Workspace(.vscode/settings.json) / Global(~/settings.json) 토글 UI
+- **메시지 흐름**: `save_workspace_config { config, target }` → Extension → `configuration.update(key, value, ConfigurationTarget)`
+- **자동 반영**: 저장 후 VSCode `onDidChangeConfiguration` 발화 → 기존 `workspace_config_changed` 메시지로 UI 자동 갱신
+- **"Open VSCode Settings" 버튼**: 유지 (직접 편집 외에 VSCode 네이티브 설정 UI 접근 경로 보존)
 
 ---
 
@@ -332,5 +340,5 @@ vibe-flow/
 ---
 
 **작성일**: 2026-06-26  
-**버전**: 1.2  
+**버전**: 1.3  
 **상태**: Phase 3 Complete, Phase 4 In Progress

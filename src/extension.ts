@@ -303,6 +303,30 @@ async function handleWebviewMessage(message: WebviewToExtMessage): Promise<void>
         await vscode.commands.executeCommand('workbench.action.openSettings', 'vibeflow');
         break;
       }
+      case 'get_workspace_config': {
+        // WebView 마운트 후 요청 → workspace_config_init으로 응답 (pull 방식)
+        sendMessage({
+          type: 'workspace_config_init',
+          payload: workspaceConfig,
+        });
+        break;
+      }
+      case 'save_workspace_config': {
+        const { config: newConfig, target } = message.payload;
+        const cfg = vscode.workspace.getConfiguration('vibeflow');
+        // ConfigurationTarget: 1 = Global, 2 = Workspace
+        const configTarget =
+          target === 'global'
+            ? vscode.ConfigurationTarget.Global
+            : vscode.ConfigurationTarget.Workspace;
+
+        await cfg.update('defaultProvider', newConfig.defaultProvider, configTarget);
+        await cfg.update('systemPrompt', newConfig.systemPrompt, configTarget);
+        await cfg.update('maxTokensPerRequest', newConfig.maxTokensPerRequest, configTarget);
+        // onDidChangeConfiguration이 자동 발화 → workspace_config_changed 자동 전송됨
+        logger.info(`Settings saved to ${target}: ${JSON.stringify(newConfig)}`);
+        break;
+      }
     }
   } catch (error) {
     logger.error(error as Error);

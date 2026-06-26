@@ -38,8 +38,10 @@ export default function App() {
     };
 
     window.addEventListener('message', messageHandler);
+    // 마운트 후 즉시 요청 (WebView 리스너 등록 후 Extension에서 응답 → race condition 방지)
+    vscode.postMessage({ type: 'get_workspace_config' });
     return () => window.removeEventListener('message', messageHandler);
-  }, []);
+  }, [vscode]);
 
   return (
     <div className="flex flex-col h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
@@ -82,6 +84,12 @@ export default function App() {
         <SettingsPanel
           config={workspaceConfig}
           onClose={() => setShowSettings(false)}
+          onSave={(newConfig, target) => {
+            vscode.postMessage({
+              type: 'save_workspace_config',
+              payload: { config: newConfig, target },
+            });
+          }}
           onOpenVSCodeSettings={() => {
             vscode.postMessage({ type: 'open_settings' });
           }}

@@ -215,6 +215,20 @@ export interface WVMsg_OpenSettings {
   type: 'open_settings';
 }
 
+/** WebView → Extension: 워크스페이스 설정 요청 (pull 방식) */
+export interface WVMsg_GetWorkspaceConfig {
+  type: 'get_workspace_config';
+}
+
+/** WebView → Extension: 워크스페이스 설정 저장 요청 */
+export interface WVMsg_SaveWorkspaceConfig {
+  type: 'save_workspace_config';
+  payload: {
+    config: WorkspaceConfig;
+    target: 'workspace' | 'global';
+  };
+}
+
 /** Extension → WebView: 초기 워크스페이스 설정 전달 */
 export interface ExtMsg_WorkspaceConfigInit {
   type: 'workspace_config_init';
@@ -248,7 +262,9 @@ export type WebviewToExtMessage =
   | WVMsg_GetProviderList
   | WVMsg_GetHistory
   | WVMsg_ClearHistory
-  | WVMsg_OpenSettings;
+  | WVMsg_OpenSettings
+  | WVMsg_GetWorkspaceConfig
+  | WVMsg_SaveWorkspaceConfig;
 
 /** 업데이트된 Extension → WebView 유니온 (Phase 4) */
 export type ExtensionToWebviewMessage =
