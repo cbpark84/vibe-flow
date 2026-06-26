@@ -2,8 +2,8 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { ILLMProvider, ChatMessage, Tool } from './providers/base';
-import { createProvider } from './providers/factory';
-import { initializeSecretStorage, getSecret, setSecret } from './utils/secretStorage';
+import { createProvider, ProviderConfig } from './providers/factory';
+import { initializeSecretStorage, getSecret, setSecret, deleteSecret } from './utils/secretStorage';
 import { getLogger } from './utils/logger';
 import { ContextManager } from './utils/contextManager';
 import { parseProviderError } from './utils/errorHandler';
@@ -186,6 +186,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // Phase 4: 워크스페이스 설정 변경 리스너 등록
   const configChangeListener = onWorkspaceConfigChange((newConfig) => {
+    // Ollama URL이나 모델이 바뀌면 프로바이더 재초기화 필요
+    if (
+      activeProviderKey === 'ollama' &&
+      (newConfig.ollamaUrl !== workspaceConfig.ollamaUrl ||
+       newConfig.ollamaModel !== workspaceConfig.ollamaModel)
+    ) {
+      provider = null; // 다음 chat_send 때 재초기화
+    }
     workspaceConfig = newConfig;
     sendMessage({
       type: 'workspace_config_changed',
@@ -269,6 +277,44 @@ async function handleWebviewMessage(message: WebviewToExtMessage): Promise<void>
         });
         break;
       }
+      case 'delete_api_key': {
+        await deleteSecret(`${message.payload.provider}-api-key`);
+        // 삭제 후 전체 상태 재확인해서 전송
+        const status: Record<string, boolean> = {};
+        for (const p of PROVIDER_LIST) {
+          status[p.key] = p.requiresApiKey
+            ? !!(await getSecret(`${p.key}-api-key`))
+            : true;
+        }
+        sendMessage({ type: 'all_api_key_status', payload: { status } });
+        break;
+      }
+      case 'get_ollama_models': {
+        const baseUrl = message.payload.url ?? workspaceConfig.ollamaUrl;
+        try {
+          const response = await fetch(`${baseUrl}/api/tags`);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const data = await response.json() as { models?: Array<{ name: string }> };
+          const models = (data.models ?? []).map(m => m.name);
+          sendMessage({ type: 'ollama_models', payload: { models } });
+        } catch (e) {
+          sendMessage({
+            type: 'ollama_models',
+            payload: { models: [], error: `Ollama에 연결할 수 없습니다: ${(e as Error).message}` },
+          });
+        }
+        break;
+      }
+      case 'check_all_api_keys': {
+        const status: Record<string, boolean> = {};
+        for (const p of PROVIDER_LIST) {
+          status[p.key] = p.requiresApiKey
+            ? !!(await getSecret(`${p.key}-api-key`))
+            : true;
+        }
+        sendMessage({ type: 'all_api_key_status', payload: { status } });
+        break;
+      }
       case 'select_provider': {
         await handleSelectProvider(message.payload.provider);
         break;
@@ -322,7 +368,12 @@ async function handleWebviewMessage(message: WebviewToExtMessage): Promise<void>
 
         await cfg.update('defaultProvider', newConfig.defaultProvider, configTarget);
         await cfg.update('systemPrompt', newConfig.systemPrompt, configTarget);
-        await cfg.update('maxTokensPerRequest', newConfig.maxTokensPerRequest, configTarget);
+        await cfg.update('claudeMaxTokens', newConfig.claudeMaxTokens, configTarget);
+        await cfg.update('openaiMaxTokens', newConfig.openaiMaxTokens, configTarget);
+        await cfg.update('geminiMaxTokens', newConfig.geminiMaxTokens, configTarget);
+        await cfg.update('ollamaMaxTokens', newConfig.ollamaMaxTokens, configTarget);
+        await cfg.update('ollamaUrl', newConfig.ollamaUrl, configTarget);
+        await cfg.update('ollamaModel', newConfig.ollamaModel, configTarget);
         // onDidChangeConfiguration이 자동 발화 → workspace_config_changed 자동 전송됨
         logger.info(`Settings saved to ${target}: ${JSON.stringify(newConfig)}`);
         break;
@@ -341,7 +392,15 @@ async function handleChatSend(userMessage: string, _attachedFiles?: string[]): P
   try {
     // Initialize provider if needed
     if (!provider) {
-      provider = createProvider(activeProviderKey);
+      const providerConfig: ProviderConfig | undefined =
+        activeProviderKey === 'ollama'
+          ? {
+              ollamaUrl: workspaceConfig.ollamaUrl,
+              ollamaModel: workspaceConfig.ollamaModel,
+            }
+          : undefined;
+
+      provider = createProvider(activeProviderKey, providerConfig);
       const secretKey = `${activeProviderKey}-api-key`;
       // Ollama는 API 키 불필요 — getSecret이 undefined를 반환하면 빈 문자열로 처리
       const apiKey = (await getSecret(secretKey)) ?? '';
@@ -405,8 +464,12 @@ async function handleChatSend(userMessage: string, _attachedFiles?: string[]): P
         });
       }
 
+      // Get current provider's maxTokens from workspace config
+      const providerMaxTokensKey = `${activeProviderKey}MaxTokens` as keyof typeof workspaceConfig;
+      const maxTokens = (workspaceConfig[providerMaxTokensKey] as number) ?? 4096;
+
       // Stream one turn from the LLM
-      for await (const chunk of provider.chat(conversationHistory, TOOLS, signal)) {
+      for await (const chunk of provider.chat(conversationHistory, TOOLS, signal, { maxTokens })) {
         if (signal.aborted) break;
 
         switch (chunk.type) {

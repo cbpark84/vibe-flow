@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
+import type { WorkspaceConfig } from '@shared/types';
 import { useChat } from './hooks/useChat';
 import { useVSCode } from './hooks/useVSCode';
 import ChatPanel from './components/ChatPanel';
 import InputBar from './components/InputBar';
 import ProviderSelector from './components/ProviderSelector';
-import SettingsPanel, { WorkspaceConfig } from './components/SettingsPanel';
+import SettingsPanel from './components/SettingsPanel';
 
-export default function App() {
+export default function App(): React.ReactElement {
   const {
     messages,
     isStreaming,
@@ -25,23 +26,42 @@ export default function App() {
 
   const [showSettings, setShowSettings] = useState(false);
   const [workspaceConfig, setWorkspaceConfig] = useState<WorkspaceConfig | null>(null);
+  const [apiKeyStatus, setApiKeyStatus] = useState<Record<string, boolean>>({});
+  const [ollamaModels, setOllamaModels] = useState<string[]>([]);
+  const [ollamaModelsError, setOllamaModelsError] = useState<string | undefined>();
+  const [settingsInitialTab, setSettingsInitialTab] = useState<'general' | 'apikeys'>('general');
 
   React.useEffect(() => {
-    const messageHandler = (event: MessageEvent) => {
+    const messageHandler = (event: MessageEvent): void => {
       const message = event.data;
 
       if (message.type === 'workspace_config_init') {
         setWorkspaceConfig(message.payload);
       } else if (message.type === 'workspace_config_changed') {
         setWorkspaceConfig(message.payload);
+      } else if (message.type === 'all_api_key_status') {
+        setApiKeyStatus(message.payload.status);
+      } else if (message.type === 'ollama_models') {
+        setOllamaModels(message.payload.models ?? []);
+        setOllamaModelsError(message.payload.error);
       }
     };
 
     window.addEventListener('message', messageHandler);
     // 마운트 후 즉시 요청 (WebView 리스너 등록 후 Extension에서 응답 → race condition 방지)
     vscode.postMessage({ type: 'get_workspace_config' });
+    vscode.postMessage({ type: 'check_all_api_keys' });
     return () => window.removeEventListener('message', messageHandler);
   }, [vscode]);
+
+  const handleSelectProvider = (providerKey: string): void => {
+    selectProvider(providerKey);
+    // API 키 미등록 프로바이더 선택 시 API Keys 탭으로 자동 오픈
+    if (apiKeyStatus[providerKey] === false) {
+      setSettingsInitialTab('apikeys');
+      setShowSettings(true);
+    }
+  };
 
   return (
     <div className="flex flex-col h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
@@ -52,7 +72,7 @@ export default function App() {
             providers={providers}
             activeProvider={activeProvider}
             isStreaming={isStreaming}
-            onSelect={selectProvider}
+            onSelect={handleSelectProvider}
           />
           <button
             onClick={() => setShowSettings(true)}
@@ -83,7 +103,10 @@ export default function App() {
       {showSettings && (
         <SettingsPanel
           config={workspaceConfig}
-          onClose={() => setShowSettings(false)}
+          onClose={() => {
+            setShowSettings(false);
+            setSettingsInitialTab('general');
+          }}
           onSave={(newConfig, target) => {
             vscode.postMessage({
               type: 'save_workspace_config',
@@ -93,6 +116,20 @@ export default function App() {
           onOpenVSCodeSettings={() => {
             vscode.postMessage({ type: 'open_settings' });
           }}
+          apiKeyStatus={apiKeyStatus}
+          ollamaModels={ollamaModels}
+          ollamaModelsError={ollamaModelsError}
+          onSaveApiKey={(provider, apiKey) => {
+            vscode.postMessage({ type: 'save_api_key', payload: { provider, apiKey } });
+            vscode.postMessage({ type: 'check_all_api_keys' });
+          }}
+          onDeleteApiKey={(provider) => {
+            vscode.postMessage({ type: 'delete_api_key', payload: { provider } });
+          }}
+          onGetOllamaModels={(url) => {
+            vscode.postMessage({ type: 'get_ollama_models', payload: { url } });
+          }}
+          initialTab={settingsInitialTab}
         />
       )}
     </div>

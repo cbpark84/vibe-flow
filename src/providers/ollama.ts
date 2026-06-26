@@ -1,8 +1,5 @@
 import { ILLMProvider, ChatMessage, Tool, StreamChunk } from './base';
 
-const OLLAMA_BASE_URL = 'http://localhost:11434';
-const DEFAULT_MODEL = 'llama3.2';
-
 interface OllamaMessage {
   role: 'user' | 'assistant' | 'tool';
   content: string;
@@ -27,13 +24,22 @@ export class OllamaProvider implements ILLMProvider {
   readonly name = 'Ollama';
   readonly maxTokens = 32_000;
 
+  private baseUrl: string;
+  private model: string;
+
+  constructor(baseUrl = 'http://localhost:11434', model = 'llama3.2') {
+    this.baseUrl = baseUrl;
+    this.model = model;
+  }
+
   // API 키 불필요 — no-op
   async initialize(): Promise<void> {}
 
   async *chat(
     messages: ChatMessage[],
     tools: Tool[] = [],
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options?: { maxTokens?: number }
   ): AsyncIterableIterator<StreamChunk> {
     // ChatMessage[] → Ollama 형식 변환
     const ollamaMessages: OllamaMessage[] = messages
@@ -55,13 +61,14 @@ export class OllamaProvider implements ILLMProvider {
 
     let response: Response;
     try {
-      response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+      response = await fetch(`${this.baseUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: DEFAULT_MODEL,
+          model: this.model,
           messages: ollamaMessages,
           tools: ollamaTools.length > 0 ? ollamaTools : undefined,
+          num_predict: options?.maxTokens ?? 2048,
           stream: true,
         }),
         signal,

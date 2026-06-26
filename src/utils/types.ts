@@ -136,6 +136,35 @@ export interface ExtMsg_Error {
   };
 }
 
+/** WebView → Extension: API 키 삭제 요청 */
+export interface WVMsg_DeleteApiKey {
+  type: 'delete_api_key';
+  payload: { provider: string };
+}
+
+/** WebView → Extension: Ollama 모델 목록 조회 요청 */
+export interface WVMsg_GetOllamaModels {
+  type: 'get_ollama_models';
+  payload: { url: string };
+}
+
+/** WebView → Extension: 모든 API 키 상태 조회 요청 */
+export interface WVMsg_CheckAllApiKeys {
+  type: 'check_all_api_keys';
+}
+
+/** Extension → WebView: Ollama 모델 목록 응답 */
+export interface ExtMsg_OllamaModels {
+  type: 'ollama_models';
+  payload: { models: string[]; error?: string };
+}
+
+/** Extension → WebView: 모든 API 키 상태 응답 */
+export interface ExtMsg_AllApiKeyStatus {
+  type: 'all_api_key_status';
+  payload: { status: Record<string, boolean> };
+}
+
 
 // ─────────────────────────────────────────────────────────────
 // Phase 2: 프로바이더 관련 메시지
@@ -207,7 +236,14 @@ export interface ExtMsg_HistoryCleared {
 export interface WorkspaceConfig {
   defaultProvider: 'claude' | 'openai' | 'gemini' | 'ollama';
   systemPrompt: string;
-  maxTokensPerRequest: number;
+  // Per-provider max output tokens
+  claudeMaxTokens: number;
+  openaiMaxTokens: number;
+  geminiMaxTokens: number;
+  ollamaMaxTokens: number;
+  // Ollama connection config (non-secret)
+  ollamaUrl: string;
+  ollamaModel: string;
 }
 
 /** WebView → Extension: VSCode 설정 패널 열기 요청 */
@@ -258,6 +294,9 @@ export type WebviewToExtMessage =
   | WVMsg_ApproveRunTerminal
   | WVMsg_SaveApiKey
   | WVMsg_CheckApiKey
+  | WVMsg_DeleteApiKey
+  | WVMsg_GetOllamaModels
+  | WVMsg_CheckAllApiKeys
   | WVMsg_SelectProvider
   | WVMsg_GetProviderList
   | WVMsg_GetHistory
@@ -276,6 +315,8 @@ export type ExtensionToWebviewMessage =
   | ExtMsg_ToolResult
   | ExtMsg_ApiKeyStatus
   | ExtMsg_Error
+  | ExtMsg_OllamaModels
+  | ExtMsg_AllApiKeyStatus
   | ExtMsg_ProviderChanged
   | ExtMsg_ProviderList
   | ExtMsg_HistoryLoaded

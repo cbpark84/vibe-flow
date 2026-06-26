@@ -25,7 +25,8 @@ export class GeminiProvider implements ILLMProvider {
   async *chat(
     messages: ChatMessage[],
     tools: Tool[] = [],
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options?: { maxTokens?: number }
   ): AsyncIterableIterator<StreamChunk> {
     if (!this.client) throw new Error('GeminiProvider not initialized');
 
@@ -96,7 +97,12 @@ export class GeminiProvider implements ILLMProvider {
       tools: geminiTools,
     });
 
-    const result = await model.generateContentStream({ contents });
+    const result = await model.generateContentStream({
+      contents,
+      generationConfig: {
+        maxOutputTokens: options?.maxTokens ?? 2048,
+      },
+    });
 
     for await (const chunk of result.stream) {
       if (signal?.aborted) throw new Error('Aborted');

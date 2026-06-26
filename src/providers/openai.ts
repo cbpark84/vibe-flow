@@ -18,7 +18,8 @@ export class OpenAIProvider implements ILLMProvider {
   async *chat(
     messages: ChatMessage[],
     tools: Tool[] = [],
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options?: { maxTokens?: number }
   ): AsyncIterableIterator<StreamChunk> {
     if (!this.client) throw new Error('OpenAIProvider not initialized');
 
@@ -67,6 +68,7 @@ export class OpenAIProvider implements ILLMProvider {
     const stream = await this.client.chat.completions.create(
       {
         model: 'gpt-4o',
+        max_tokens: options?.maxTokens ?? 2048,
         messages: oaiMessages,
         tools: oaiTools.length > 0 ? oaiTools : undefined,
         stream: true,

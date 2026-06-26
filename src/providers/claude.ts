@@ -20,7 +20,8 @@ export class ClaudeProvider implements ILLMProvider {
   async *chat(
     messages: ChatMessage[],
     tools?: Tool[],
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options?: { maxTokens?: number }
   ): AsyncIterableIterator<StreamChunk> {
     if (!this.client) {
       throw new Error('ClaudeProvider not initialized');
@@ -40,7 +41,7 @@ export class ClaudeProvider implements ILLMProvider {
     // Using Claude 3.5 Sonnet - most capable model available
     const stream = this.client.messages.stream({
       model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 4096,
+      max_tokens: options?.maxTokens ?? 4096,
       tools: anthropicTools.length > 0 ? anthropicTools : undefined,
       messages: anthropicMessages,
     });

@@ -6,7 +6,12 @@ import * as vscode from 'vscode';
 export interface WorkspaceConfig {
   defaultProvider: 'claude' | 'openai' | 'gemini' | 'ollama';
   systemPrompt: string;
-  maxTokensPerRequest: number;
+  claudeMaxTokens: number;
+  openaiMaxTokens: number;
+  geminiMaxTokens: number;
+  ollamaMaxTokens: number;
+  ollamaUrl: string;
+  ollamaModel: string;
 }
 
 /**
@@ -18,7 +23,12 @@ export function getWorkspaceConfig(): WorkspaceConfig {
   return {
     defaultProvider: config.get<WorkspaceConfig['defaultProvider']>('defaultProvider', 'claude'),
     systemPrompt: config.get<string>('systemPrompt', ''),
-    maxTokensPerRequest: config.get<number>('maxTokensPerRequest', 4096),
+    claudeMaxTokens: config.get<number>('claudeMaxTokens', 4096),
+    openaiMaxTokens: config.get<number>('openaiMaxTokens', 2048),
+    geminiMaxTokens: config.get<number>('geminiMaxTokens', 2048),
+    ollamaMaxTokens: config.get<number>('ollamaMaxTokens', 2048),
+    ollamaUrl: config.get<string>('ollamaUrl', 'http://localhost:11434'),
+    ollamaModel: config.get<string>('ollamaModel', 'llama3.2'),
   };
 }
 
@@ -30,11 +40,7 @@ export function onWorkspaceConfigChange(
   callback: (config: WorkspaceConfig) => void
 ): vscode.Disposable {
   return vscode.workspace.onDidChangeConfiguration(event => {
-    if (
-      event.affectsConfiguration('vibeflow.defaultProvider') ||
-      event.affectsConfiguration('vibeflow.systemPrompt') ||
-      event.affectsConfiguration('vibeflow.maxTokensPerRequest')
-    ) {
+    if (event.affectsConfiguration('vibeflow')) {
       callback(getWorkspaceConfig());
     }
   });

@@ -78,12 +78,14 @@ export interface ILLMProvider {
    * @param messages - 전체 대화 히스토리
    * @param tools    - LLM에 노출할 도구 목록 (없으면 빈 배열)
    * @param signal   - 스트리밍 취소용 AbortSignal
+   * @param options  - max_tokens 등 선택 파라미터
    * @yields StreamChunk — text / tool_use / tool_result 순서로 발행
    */
   chat(
     messages: ChatMessage[],
     tools?: Tool[],
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options?: { maxTokens?: number }
   ): AsyncIterableIterator<StreamChunk>;
 
   /**
