@@ -335,6 +335,7 @@ tsconfig.json
 - ✅ 승인 대기 2분 타임아웃 (write_file, run_terminal)
 - ✅ Activity Bar 아이콘 표시 (SVG 아이콘 + WebviewViewProvider 전환)
 - ✅ 보조 사이드바(Secondary Side Bar) 지원
+- ✅ ESLint 0 경고 달성 (TypeScript 반환 타입 어노테이션 완비)
 
 ---
 
@@ -386,5 +387,5 @@ MIT License — 자유롭게 사용, 수정, 배포 가능
 ---
 
 **Last Updated**: 2026-06-26  
-**Version**: 0.5.1 (Sidebar WebviewViewProvider + Activity Bar Icon)  
+**Version**: 0.6.0 (ESLint Clean + Phase 4 Progress)  
 **GitHub**: https://github.com/cbpark84/vibe-flow

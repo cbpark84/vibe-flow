@@ -24,7 +24,7 @@
 | | Vite | 5.0+ | 고속 번들링 |
 | | Tailwind CSS | 3.0+ | 스타일링 |
 | | TypeScript | 5.0+ | 타입 안전성 |
-| **LLM SDK** | @anthropic-ai/sdk | 0.24+ | Claude API |
+| **LLM SDK** | @anthropic-ai/sdk | 0.30+ | Claude API |
 | | openai | 4.0+ | OpenAI API |
 | | @google/generative-ai | 0.12+ | Gemini API |
 | | Ollama REST API | - | 로컬 LLM |
@@ -246,6 +246,7 @@ vibe-flow/
 - [x] SettingsPanel API Key 관리 탭 (프로바이더별 키 등록/삭제, Ollama URL+모델 선택)
 - [x] SettingsPanel General 탭: 프로바이더별 Max Tokens 슬라이더
 - [x] Ollama 모델 목록 자동 로드 (GET /api/tags)
+- [x] ESLint 0 경고 달성 (TypeScript 반환 타입 어노테이션 완비)
 - [ ] 다국어 지원 (i18n)
 - [ ] CI/CD 파이프라인 구축
 - [ ] 마켓플레이스 README, 스크린샷, 설정 가이드
@@ -335,7 +336,9 @@ vibe-flow/
 
 - [VSCode Extension API](https://code.visualstudio.com/api)
 - [VSCode WebView API](https://code.visualstudio.com/api/extension-guides/webview)
-- [Anthropic SDK (Python/JS)](https://github.com/anthropics/anthropic-sdk-python)
+- [Anthropic SDK (JavaScript)](https://github.com/anthropics/anthropic-sdk-typescript)
+- [Anthropic API Reference](https://docs.anthropic.com/en/api)
+- [Claude Models](https://docs.anthropic.com/en/docs/about-claude/models)
 - [OpenAI JS SDK](https://github.com/openai/node-sdk)
 - [Google Generative AI SDK](https://github.com/google/generative-ai-js)
 - [Ollama](https://ollama.ai/)
@@ -343,5 +346,5 @@ vibe-flow/
 ---
 
 **작성일**: 2026-06-26  
-**버전**: 1.3  
+**버전**: 1.4  
 **상태**: Phase 3 Complete, Phase 4 In Progress
