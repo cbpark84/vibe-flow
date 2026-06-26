@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useChat } from './hooks/useChat';
+import { useVSCode } from './hooks/useVSCode';
 import ChatPanel from './components/ChatPanel';
 import InputBar from './components/InputBar';
 import ProviderSelector from './components/ProviderSelector';
@@ -19,14 +20,13 @@ export default function App() {
     clearHistory,
   } = useChat();
 
+  // useChat 내부에서 이미 획득된 싱글턴 인스턴스를 반환 (acquireVsCodeApi 재호출 없음)
+  const vscode = useVSCode();
+
   const [showSettings, setShowSettings] = useState(false);
   const [workspaceConfig, setWorkspaceConfig] = useState<WorkspaceConfig | null>(null);
 
-  // Phase 4: Extension 메시지 수신 처리 추가
   React.useEffect(() => {
-    const vscode = window.acquireVsCodeApi?.();
-    if (!vscode) return;
-
     const messageHandler = (event: MessageEvent) => {
       const message = event.data;
 
@@ -83,8 +83,7 @@ export default function App() {
           config={workspaceConfig}
           onClose={() => setShowSettings(false)}
           onOpenVSCodeSettings={() => {
-            const vscode = window.acquireVsCodeApi?.();
-            vscode?.postMessage({ type: 'open_settings' });
+            vscode.postMessage({ type: 'open_settings' });
           }}
         />
       )}

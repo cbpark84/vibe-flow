@@ -662,8 +662,12 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
   // 에셋 경로 교체: /assets/, ./assets/, assets/ 세 가지 패턴 모두 처리
   html = html.replace(/(src|href)="(\.\/)?\/?assets\//g, `$1="${distWebviewUri}/assets/`);
 
-  // CSP nonce 플레이스홀더를 실제 nonce로 교체
+  // CSP nonce + webviewCspSrc 플레이스홀더 교체
   html = html.replace(/\$\{nonce\}/g, nonce);
+  html = html.replace(/\$\{webviewCspSrc\}/g, webview.cspSource);
+
+  // crossorigin 속성 제거 (VSCode WebView는 CORS 모드를 지원하지 않음)
+  html = html.replace(/ crossorigin/g, '');
 
   // 모든 <script> 태그에 nonce 속성 주입 (CSP nonce-xxx 정책 통과)
   html = html.replace(/<script /g, `<script nonce="${nonce}" `);

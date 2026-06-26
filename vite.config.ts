@@ -11,6 +11,10 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: path.resolve(__dirname, 'src/webview/index.html'),
+      output: {
+        format: 'iife',
+        name: 'VibeFlow',
+      },
     },
   },
   resolve: {
