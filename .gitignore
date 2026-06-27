@@ -4,5 +4,10 @@ out/
 *.vsix
 .DS_Store
 *.log
+
+# 환경 변수 및 시크릿
 .env
-.env.local
+.env.*
+*.key
+*.pem
+secrets/
