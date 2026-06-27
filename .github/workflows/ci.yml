@@ -1,0 +1,161 @@
+# CI Workflow: Pull Request 검증
+#
+# 트리거: main 브랜치 대상 PR 생성/업데이트 시
+# 목적: TypeScript 컴파일, ESLint, WebView 빌드, 단위 테스트를 순차 검증
+# fail-fast: 각 Job은 독립 실행. 빌드 실패 시 이후 Job 중단.
+
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  # 수동 트리거 (디버깅용)
+  workflow_dispatch:
+
+# 동일 PR에 새 커밋 push 시 이전 실행 자동 취소 (중복 실행 방지)
+# workflow_dispatch 시 github.run_id 사용 (PR number 없음)
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────
+  # Job 1: Extension Host 빌드 (TypeScript → esbuild)
+  # ─────────────────────────────────────────────
+  build-extension:
+    name: Build Extension Host
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile Extension Host (esbuild)
+        run: npm run compile:ext
+
+      - name: Upload extension bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-bundle
+          path: dist/extension.js
+          retention-days: 1
+
+  # ─────────────────────────────────────────────
+  # Job 2: WebView 빌드 (React + Vite)
+  # ─────────────────────────────────────────────
+  build-webview:
+    name: Build WebView (React + Vite)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build WebView (Vite)
+        run: npm run compile:web
+
+      - name: Upload webview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: webview-bundle
+          path: dist/webview/
+          retention-days: 1
+
+  # ─────────────────────────────────────────────
+  # Job 3: ESLint 검사 (TypeScript + TSX 전체)
+  # ─────────────────────────────────────────────
+  lint:
+    name: ESLint Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint (0 warnings policy)
+        run: npm run lint
+
+  # ─────────────────────────────────────────────
+  # Job 4: 단위 테스트 (ts-node, VSCode 환경 불필요)
+  # 대상: terminal / filesystem / errorHandler / factory
+  # ─────────────────────────────────────────────
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests (ts-node)
+        run: npm run test
+
+  # ─────────────────────────────────────────────
+  # Job 5: 통합 상태 Gate (모든 Job 통과 여부 확인)
+  # PR merge 조건으로 이 Job만 required로 설정하면 됨
+  # ─────────────────────────────────────────────
+  ci-gate:
+    name: CI Gate (All Checks Passed)
+    runs-on: ubuntu-latest
+    needs:
+      - build-extension
+      - build-webview
+      - lint
+      - test
+    if: always()
+
+    steps:
+      - name: Check all jobs succeeded
+        run: |
+          FAILED=0
+          [[ "${{ needs.build-extension.result }}" != "success" ]] && echo "❌ build-extension failed" && FAILED=1
+          [[ "${{ needs.build-webview.result }}" != "success" ]] && echo "❌ build-webview failed" && FAILED=1
+          [[ "${{ needs.lint.result }}" != "success" ]] && echo "❌ lint failed" && FAILED=1
+          [[ "${{ needs.test.result }}" != "success" ]] && echo "❌ test failed" && FAILED=1
+
+          if [[ $FAILED -eq 1 ]]; then
+            echo "One or more CI jobs failed."
+            exit 1
+          fi
+          echo "✅ All CI checks passed."

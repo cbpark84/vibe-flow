@@ -19,6 +19,22 @@
 - **API 키 보안 저장** — VSCode SecretStorage 암호화 저장 (코드/파일에 절대 저장 안 함)
 - **🛡️ 강화된 에러 처리** — Anthropic 공식 SDK 에러 타입 기반 구분 (인증/레이트 리미트/네트워크 오류)
 
+## Screenshots
+
+> 스크린샷을 추가하려면 `images/SCREENSHOTS.md`를 참고하세요.
+
+<!-- 스크린샷 준비 후 아래 주석을 해제하고 파일명을 확인하세요 -->
+<!--
+![Chat Overview](images/chat-overview.png)
+*멀티 프로바이더 AI 채팅 인터페이스*
+
+![Diff Preview](images/file-diff-preview.png)
+*파일 수정 전 Diff 미리보기 및 사용자 승인*
+
+![Settings Panel](images/settings-panel.png)
+*프로바이더별 API 키 관리 및 설정*
+-->
+
 ---
 
 ## Requirements
@@ -265,6 +281,108 @@ dist/
     ├── index.html        # WebView HTML
     └── assets/           # JS, CSS 번들
 ```
+
+---
+
+## CI/CD
+
+`.github/workflows/` 안에 3개의 GitHub Actions 워크플로우가 구성되어 있습니다.
+
+### 워크플로우 개요
+
+| 파일 | 트리거 | 역할 |
+|------|--------|------|
+| `ci.yml` | PR → `main` | 빌드 / 린트 / 테스트 자동 검증 |
+| `release.yml` | `v*` 태그 push | VSIX 패키지 빌드 → GitHub Release → 마켓플레이스 배포 |
+| `dependency-review.yml` | PR에서 `package.json` 변경 시 | 신규 의존성 CVE 취약점 자동 검사 |
+
+### CI 파이프라인 (`ci.yml`)
+
+PR이 열리거나 커밋이 추가될 때마다 아래 4개 Job이 병렬 실행됩니다:
+
+```
+build-extension ──┐
+build-webview   ──┼──▶ ci-gate ✅ (Branch Protection required check)
+lint            ──┤
+test            ──┘
+```
+
+- 동일 PR에 새 커밋이 오면 이전 실행 자동 취소 (중복 방지)
+- **`ci-gate` Job 하나만** Branch Protection required check로 등록하면 됩니다
+
+### Release 파이프라인 (`release.yml`)
+
+`v0.1.0` 같은 태그를 push하면 자동 실행됩니다:
+
+```
+validate ──▶ build ──▶ package ──▶ GitHub Release
+                                └──▶ VS Marketplace (VSCE_PAT 설정 시)
+```
+
+- `validate`: `package.json` 버전 ↔ 태그 버전 불일치 시 즉시 실패
+- `release`: GitHub Release 자동 생성 + VSIX 파일 첨부
+- `publish-marketplace`: `VSCE_PAT` 시크릿 없으면 자동 스킵
+
+### 설정 방법 (3단계)
+
+#### Step 1 — Branch Protection 설정
+
+GitHub 저장소 → **Settings → Branches → Add rule**
+
+```
+Branch name pattern : main
+☑ Require status checks to pass before merging
+  → required check로 "CI Gate (All Checks Passed)" 추가
+☑ Require branches to be up to date before merging
+```
+
+> `ci-gate` Job 하나만 등록하면 하위 Job이 변경돼도 규칙 수정 불필요합니다.
+
+#### Step 2 — VSCE_PAT 발급 (마켓플레이스 배포 시)
+
+1. [Azure DevOps](https://dev.azure.com) → **User Settings → Personal Access Tokens**
+2. **New Token** → 이름: `vibe-flow-marketplace`
+3. Organization: `All accessible organizations`
+4. Scopes: **Marketplace → Manage** 체크
+5. 생성된 토큰 복사
+
+GitHub 저장소 → **Settings → Secrets and variables → Actions → New repository secret**
+
+```
+Name  : VSCE_PAT
+Value : (복사한 토큰 붙여넣기)
+```
+
+> `VSCE_PAT`가 없으면 GitHub Release만 생성되고 마켓플레이스 배포는 자동 스킵됩니다.
+
+#### Step 3 — 첫 릴리스
+
+```bash
+# 1. package.json 버전 확인/업데이트
+#    (태그 버전과 반드시 일치해야 함)
+cat package.json | grep '"version"'
+
+# 2. 태그 생성 및 push
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Actions 탭에서 Release 워크플로우 진행 상황을 확인할 수 있습니다.
+
+### Dry Run (배포 없이 빌드만 테스트)
+
+GitHub → **Actions → Release → Run workflow**
+
+```
+dry_run: true   ← 기본값, VSIX 빌드만 실행 (배포 안 함)
+```
+
+### 필요한 GitHub Secrets 요약
+
+| Secret | 필수 여부 | 용도 |
+|--------|----------|------|
+| `GITHUB_TOKEN` | 자동 제공 | GitHub Release 생성 (별도 설정 불필요) |
+| `VSCE_PAT` | 선택 | VS Code Marketplace 배포 |
 
 ---
 

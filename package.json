@@ -3,6 +3,23 @@
   "displayName": "Vibe Flow",
   "description": "AI-powered coding assistant for VSCode",
   "version": "0.1.0",
+  "publisher": "cbpark84",
+  "license": "MIT",
+  "categories": ["AI", "Chat", "Programming Languages", "Other"],
+  "keywords": ["ai", "claude", "openai", "gemini", "ollama", "chatgpt", "coding assistant", "llm", "copilot"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cbpark84/vibe-flow.git"
+  },
+  "homepage": "https://github.com/cbpark84/vibe-flow#readme",
+  "bugs": {
+    "url": "https://github.com/cbpark84/vibe-flow/issues"
+  },
+  "icon": "resources/icon.png",
+  "galleryBanner": {
+    "color": "#1e1e2e",
+    "theme": "dark"
+  },
   "l10n": "./l10n",
   "engines": {
     "vscode": "^1.85.0"

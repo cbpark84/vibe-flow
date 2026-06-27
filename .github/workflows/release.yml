@@ -1,0 +1,246 @@
+# Release CD Workflow: VSIX 패키지 빌드 및 배포
+#
+# 트리거: v* 형태의 태그 push (예: v0.1.0, v1.0.0)
+# 단계:
+#   1. validate  → package.json 버전과 태그 일치 확인
+#   2. build     → Extension + WebView 전체 빌드
+#   3. package   → VSIX 생성 (vsce package)
+#   4. release   → GitHub Release 생성 + VSIX 첨부
+#   5. publish   → VS Marketplace 배포 (VSCE_PAT 시크릿 있을 때만)
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  # 수동 트리거 (테스트용, 태그 없이 실행 시 version 입력 필요)
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (VSIX 빌드만, 배포 안 함)'
+        required: false
+        default: 'true'
+        type: boolean
+
+jobs:
+  # ─────────────────────────────────────────────
+  # Job 1: 태그 버전과 package.json 버전 일치 검증
+  # 불일치 시 빠른 실패로 잘못된 릴리스 방지
+  # ─────────────────────────────────────────────
+  validate:
+    name: Validate Version Consistency
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.extract.outputs.version }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: extract
+        run: |
+          # 태그에서 'v' 접두사 제거 (v0.1.0 → 0.1.0)
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+
+          echo "Tag version   : $TAG_VERSION"
+          echo "package.json  : $PKG_VERSION"
+
+          if [[ "$TAG_VERSION" != "$PKG_VERSION" ]]; then
+            echo "ERROR: Tag version ($TAG_VERSION) does not match package.json version ($PKG_VERSION)"
+            echo "Fix: Update package.json version before tagging."
+            exit 1
+          fi
+
+          echo "version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
+
+  # ─────────────────────────────────────────────
+  # Job 2: 전체 빌드 (Extension + WebView)
+  # CI와 동일한 빌드를 릴리스 전에 재실행하여 신뢰성 보장
+  # ─────────────────────────────────────────────
+  build:
+    name: Build (Extension + WebView)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: validate
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile Extension Host (esbuild, production)
+        # watch=false이므로 sourcemap 제외, minify 적용 (esbuild.config.js 기준)
+        run: npm run compile:ext
+
+      - name: Build WebView (Vite, production)
+        run: npm run compile:web
+
+      - name: Run ESLint (release gate)
+        run: npm run lint
+
+      - name: Run unit tests (release gate)
+        run: npm run test
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ needs.validate.outputs.version }}
+          path: dist/
+          retention-days: 7
+
+  # ─────────────────────────────────────────────
+  # Job 3: VSIX 패키지 생성
+  # vsce package → vibe-flow-{version}.vsix
+  # ─────────────────────────────────────────────
+  package:
+    name: Package VSIX
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - validate
+      - build
+    outputs:
+      vsix_name: ${{ steps.vsix.outputs.vsix_name }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ needs.validate.outputs.version }}
+          path: dist/
+
+      - name: Install vsce globally
+        # @vscode/vsce: VS Code Extension CLI (패키징 및 마켓플레이스 배포 도구)
+        run: npm install -g @vscode/vsce
+
+      - name: Build VSIX package
+        id: vsix
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          VSIX_NAME="vibe-flow-${VERSION}.vsix"
+
+          # vsce package: package.json의 "package" 스크립트와 동일
+          # --no-dependencies: CI에서 이미 npm ci로 설치됨, 재설치 불필요
+          vsce package --no-dependencies --out "$VSIX_NAME"
+
+          echo "VSIX created: $VSIX_NAME ($(du -sh $VSIX_NAME | cut -f1))"
+          echo "vsix_name=$VSIX_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vsix-${{ needs.validate.outputs.version }}
+          path: ${{ steps.vsix.outputs.vsix_name }}
+          retention-days: 30
+
+  # ─────────────────────────────────────────────
+  # Job 4: GitHub Release 생성 + VSIX 첨부
+  # ─────────────────────────────────────────────
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - validate
+      - package
+    # 태그 push(dry_run 없음) 또는 workflow_dispatch(dry_run != 'true')일 때만 실행
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run != 'true')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download VSIX artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: vsix-${{ needs.validate.outputs.version }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Vibe Flow v${{ needs.validate.outputs.version }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          # CHANGELOG.md가 없으므로 자동 생성 릴리스 노트 사용
+          generate_release_notes: true
+          files: ${{ needs.package.outputs.vsix_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─────────────────────────────────────────────
+  # Job 5: VS Code Marketplace 배포 (선택적)
+  # VSCE_PAT 시크릿이 설정된 경우에만 실행
+  # dry_run 또는 pre-release 태그 시 건너뜀
+  # ─────────────────────────────────────────────
+  publish-marketplace:
+    name: Publish to VS Marketplace
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - validate
+      - package
+      - release
+    # VSCE_PAT 없으면 건너뜀 / pre-release 버전 건너뜀 / dry_run 시 건너뜀
+    if: |
+      env.VSCE_PAT != '' &&
+      !contains(github.ref_name, '-') &&
+      (github.event_name == 'push' || github.event.inputs.dry_run != 'true')
+    env:
+      # secrets 변수는 if 조건에서 직접 비교 불가. env로 변환하여 검사
+      VSCE_PAT: ${{ secrets.VSCE_PAT || '' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download VSIX artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: vsix-${{ needs.validate.outputs.version }}
+
+      - name: Install vsce globally
+        run: npm install -g @vscode/vsce
+
+      - name: Publish to VS Code Marketplace
+        run: |
+          VSIX_NAME="${{ needs.package.outputs.vsix_name }}"
+          echo "Publishing $VSIX_NAME to VS Code Marketplace..."
+          vsce publish --packagePath "$VSIX_NAME" --pat "${{ secrets.VSCE_PAT }}"

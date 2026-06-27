@@ -1,0 +1,42 @@
+# Source files (compiled output in dist/ is included)
+src/
+test/
+
+# Build configs
+esbuild.config.js
+vite.config.ts
+postcss.config.cjs
+tailwind.config.js
+tsconfig*.json
+
+# Linting / formatting
+.eslintrc*
+.eslintignore
+.prettierrc*
+.prettierignore
+.editorconfig
+
+# CI/CD & GitHub
+.github/
+.gitignore
+.gitattributes
+
+# Dev docs (internal)
+AGENTS.md
+CLAUDE.md
+PLAN.md
+ARCHITECTURE.md
+
+# Tests
+**/*.test.ts
+**/*.spec.ts
+src/test/
+
+# Node modules (vsce excludes by default, explicit for safety)
+node_modules/
+
+# Misc
+*.vsix
+.DS_Store
+*.log
+.ai/

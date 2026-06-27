@@ -1,0 +1,36 @@
+# Dependency Review Workflow
+#
+# 트리거: main 브랜치 대상 PR에서 package-lock.json 변경 시
+# 목적: 새로 추가된 의존성의 알려진 취약점(CVE) 자동 검사
+# GitHub Advanced Security (무료 퍼블릭 저장소 또는 GHAS 라이선스 필요)
+
+name: Dependency Review
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'package-lock.json'
+      - 'package.json'
+
+jobs:
+  dependency-review:
+    name: Dependency Review (CVE Check)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          # critical, high 취약점만 실패 처리 (moderate는 경고만)
+          fail-on-severity: high
+          # 취약점 발견 시 PR에 코멘트로 요약 게시
+          comment-summary-in-pr: always
