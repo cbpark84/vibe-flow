@@ -264,7 +264,7 @@ vibe-flow/
 
 - [x] 전체 기능 통합 테스트 (31개 테스트 통과: terminal/filesystem/errorHandler/factory)
 - [x] 보안 감시 (API 키 노출 검사) (PASS: 하드코딩 없음, SecretStorage 준수, .gitignore 보강)
-- [ ] 성능 최적화 (번들 크기, 메모리)
+- [x] 성능 최적화 (번들 크기, 메모리) (Extension: 705.9KB, WebView: 166KB, 메모리 200개 메시지 상한)
 - [x] 에러 처리 및 사용자 메시지 개선 (Step 1: Anthropic 공식 에러 타입 분류)
 - [x] SettingsPanel 인라인 에디터 (Workspace/Global 저장 토글, 직접 수정 가능)
 - [x] SettingsPanel API Key 관리 탭 (프로바이더별 키 등록/삭제, Ollama URL+모델 선택)

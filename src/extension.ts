@@ -24,6 +24,9 @@ let abortController: AbortController | null = null;
 // Phase 3: ExtensionContext를 모듈 레벨에서 접근하기 위한 참조
 let extensionContext: vscode.ExtensionContext | null = null;
 const HISTORY_STATE_KEY = 'vibeflow.conversationHistory';
+// performance: globalState 저장 크기 제한 (메시지 수 기준)
+// ContextManager가 토큰 기반으로 trim하지만 스토리지도 별도 제한 필요
+const MAX_HISTORY_STORAGE = 200;
 
 // Phase 2: 현재 활성 프로바이더 키 (기본값: 'claude')
 let activeProviderKey = 'claude';
@@ -425,8 +428,9 @@ async function handleChatSend(userMessage: string): Promise<void> {
     // Add user message to history
     conversationHistory.push({ role: 'user', content: userMessage });
 
-    // Phase 3: 히스토리 저장
-    await extensionContext?.globalState.update(HISTORY_STATE_KEY, conversationHistory);
+    // Phase 3: 히스토리 저장 (performance: 크기 제한 적용)
+    const historyToSave = conversationHistory.slice(-MAX_HISTORY_STORAGE);
+    await extensionContext?.globalState.update(HISTORY_STATE_KEY, historyToSave);
 
     abortController = new AbortController();
     const signal = abortController.signal;
@@ -500,7 +504,9 @@ async function handleChatSend(userMessage: string): Promise<void> {
       // Save assistant text turn to history
       if (assistantTextBuffer) {
         conversationHistory.push({ role: 'assistant', content: assistantTextBuffer });
-        await extensionContext?.globalState.update(HISTORY_STATE_KEY, conversationHistory);
+        // performance: 크기 제한 적용
+        const historyToSave = conversationHistory.slice(-MAX_HISTORY_STORAGE);
+        await extensionContext?.globalState.update(HISTORY_STATE_KEY, historyToSave);
       }
 
       // No tools → conversation turn complete
