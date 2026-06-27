@@ -1,0 +1,16 @@
+{
+  "command.openChat": "대화 열기",
+  "command.setApiKey": "API 키 설정",
+  "command.clearHistory": "히스토리 삭제",
+  "config.context.claude.triggerPercent.description": "Claude 컨텍스트 토큰이 이 비율에 도달하면 압축 시작 (%)",
+  "config.context.claude.targetPercent.description": "Claude 컨텍스트 압축 목표 비율 (%)",
+  "config.context.openai.triggerPercent.description": "OpenAI 컨텍스트 토큰이 이 비율에 도달하면 압축 시작 (%)",
+  "config.context.openai.targetPercent.description": "OpenAI 컨텍스트 압축 목표 비율 (%)",
+  "config.context.gemini.triggerPercent.description": "Gemini 컨텍스트 토큰이 이 비율에 도달하면 압축 시작 (%)",
+  "config.context.gemini.targetPercent.description": "Gemini 컨텍스트 압축 목표 비율 (%)",
+  "config.context.ollama.triggerPercent.description": "Ollama 컨텍스트 토큰이 이 비율에 도달하면 압축 시작 (%)",
+  "config.context.ollama.targetPercent.description": "Ollama 컨텍스트 압축 목표 비율 (%)",
+  "config.defaultProvider.description": "기본 AI 프로바이더",
+  "config.systemPrompt.description": "이 워크스페이스의 커스텀 시스템 프롬프트 (비어 있으면 기본 프롬프트 사용)",
+  "config.maxTokensPerRequest.description": "AI 요청당 최대 응답 토큰 수"
+}

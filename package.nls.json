@@ -1,0 +1,16 @@
+{
+  "command.openChat": "Vibe Flow: Open Chat",
+  "command.setApiKey": "Vibe Flow: Set API Key",
+  "command.clearHistory": "Vibe Flow: Clear History",
+  "config.context.claude.triggerPercent.description": "Claude: Context trim trigger threshold (%). Removes old messages when exceeded.",
+  "config.context.claude.targetPercent.description": "Claude: Target context usage after trim (%). Must be lower than triggerPercent.",
+  "config.context.openai.triggerPercent.description": "OpenAI: Context trim trigger threshold (%).",
+  "config.context.openai.targetPercent.description": "OpenAI: Target context usage after trim (%).",
+  "config.context.gemini.triggerPercent.description": "Gemini: Context trim trigger threshold (%).",
+  "config.context.gemini.targetPercent.description": "Gemini: Target context usage after trim (%).",
+  "config.context.ollama.triggerPercent.description": "Ollama: Context trim trigger threshold (%). Lower default for smaller models.",
+  "config.context.ollama.targetPercent.description": "Ollama: Target context usage after trim (%).",
+  "config.defaultProvider.description": "Default AI provider for this workspace.",
+  "config.systemPrompt.description": "Custom system prompt for this workspace (uses default prompt if empty).",
+  "config.maxTokensPerRequest.description": "Maximum response tokens per AI request."
+}

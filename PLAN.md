@@ -271,7 +271,7 @@ vibe-flow/
 - [x] SettingsPanel General 탭: 프로바이더별 Max Tokens 슬라이더
 - [x] Ollama 모델 목록 자동 로드 (GET /api/tags)
 - [x] ESLint 0 경고 달성 (TypeScript 반환 타입 어노테이션 완비)
-- [ ] 다국어 지원 (i18n)
+- [x] 다국어 지원 (i18n) (VSCode l10n 공식 방식: package.nls.json/ko, WebView I18nContext, l10n 번들)
 - [ ] CI/CD 파이프라인 구축
 - [ ] 마켓플레이스 README, 스크린샷, 설정 가이드
 - [ ] 배포 및 버전 관리
