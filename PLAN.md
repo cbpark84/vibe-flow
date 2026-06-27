@@ -128,39 +128,16 @@ interface ILLMProvider {
 ### 3.5 Ollama Agentic Layer (Phase 5)
 
 Ollama 프로바이더가 단순 채팅을 넘어 **Claude Code 수준의 에이전트 동작**을 수행하기 위한 계층.
-클라우드 LLM 대비 작은 컨텍스트 윈도우와 약한 추론 능력을 **마이크로 태스크 분해**와 **검증 루프**로 보완한다.
 
-**핵심 철학**: 빠른 한 번의 답변보다 검증된 100번의 작은 실행
+**역할 분담**:
+- **vibe-rag (Python 별도 프로젝트)**: 프로젝트 탐색, Knowledge Graph, RAG 검색 → MCP 서버로 제공
+- **Vibe Flow 플러그인 (이 프로젝트)**: MCP 클라이언트 연결 + Task Planner + Verify Loop
 
-```
-사용자 요청
-↓
-[1] Project Understanding (프로젝트 구조 자동 탐색)
-     언어 / 패키지 매니저 / 빌드 / 테스트 / 아키텍처 감지
-↓
-[2] Task Planning (.ai/tasks/task_xxx.md 생성 및 승인)
-     목표 / 영향 파일 / 리스크 / 롤백 전략 포함
-↓
-[3] Micro Task Decomposition (함수 단위로 분해)
-     Large Goal → Feature → Component → Function → One Edit
-↓
-[4] Execute One Step (단일 함수/메서드만 수정)
-↓
-[5] Verify (컴파일 → 린트 → 단위 테스트 → Diff 리뷰)
-↓
-[6] Reflect (성공 여부 판단 → 플랜 갱신)
-↓
-[4]로 반복 또는 완료
-```
-
-**컨텍스트 최소화 전략**:
-- Knowledge Graph를 통해 관련 파일/함수만 선별 로드
-- 전체 저장소 로딩 금지 — 반드시 관련 파일만 Retrieve
-- 각 스텝은 독립 실행 가능한 단위로 분리
-
-**도구 정책**:
-- LLM이 도구를 직접 실행하지 않고 요청만 함
-- Extension Host가 권한 검증 후 실행 (기존 postMessage 패턴 재사용)
+**플러그인 내부 구조** (`src/agent/`):
+- `mcpClient.ts`: vibe-rag MCP 서버 연결
+- `taskPlanner.ts`: `.ai/tasks/task_xxx.md` 생성 및 사용자 승인 흐름
+- `microTaskDecomposer.ts`: 함수 단위 마이크로 태스크 분해
+- `verifyLoop.ts`: 컴파일 → 린트 → 테스트 자동 검증 루프
 
 ---
 
@@ -201,13 +178,12 @@ vibe-flow/
 │       ├── secretStorage.ts         # 보안: API 키 저장/조회
 │       ├── logger.ts                # VSCode OutputChannel 래퍼
 │       └── types.ts                 # 공용 타입 정의
-│   └── agent/                           # Ollama Agentic Layer (Phase 5)
-│       ├── projectUnderstanding.ts      # 프로젝트 구조 탐색 파이프라인
-│       ├── taskPlanner.ts               # 태스크 플랜 생성/관리
+│   └── agent/                           # Ollama Agentic Layer (Phase 5) — 플러그인 담당 부분
+│       ├── mcpClient.ts                 # vibe-rag MCP 서버 연결 클라이언트
+│       ├── taskPlanner.ts               # 태스크 플랜 생성/관리 (.ai/tasks/)
 │       ├── microTaskDecomposer.ts       # 마이크로 태스크 분해 엔진
-│       ├── verifyLoop.ts                # 컴파일/린트/테스트 자동 검증
-│       ├── contextRetriever.ts          # Knowledge Graph 기반 파일 선별
-│       └── knowledgeGraph.ts            # 프로젝트 지식 그래프 빌더
+│       └── verifyLoop.ts                # 컴파일/린트/테스트 자동 검증
+# NOTE: projectUnderstanding, knowledgeGraph, contextRetriever는 vibe-rag (Python) 프로젝트로 이관
 ├── .ai/                                 # Ollama 에이전트 영구 메모리
 │   ├── tasks/                           # 태스크 플랜 파일 (task_xxx.md)
 │   ├── memory/                          # 프로젝트 요약, 아키텍처 메모
@@ -309,6 +285,30 @@ vibe-flow/
 ### Phase 5: Ollama Agentic Mode - Week 9-12
 **목표**: Ollama에서 Claude Code 수준의 자율 에이전트 동작 구현
 
+**아키텍처 방향 (2026-06-27 확정)**:
+- RAG / Knowledge Graph는 **별도 Python 프로젝트**로 구현 후 MCP 서버로 감싸기
+- Vibe Flow 플러그인은 MCP 클라이언트로 연결하여 에이전트 루프만 담당
+- 두 프로젝트가 역할을 나눠 각자 독립적으로 개선 가능
+
+**전체 흐름**:
+
+```
+사용자 요청
+↓
+[Vibe Flow 플러그인]  ─── MCP 호출 ───▶  [vibe-rag 서비스 (Python)]
+  에이전트 루프                              - 프로젝트 구조 탐색
+  Task Planner                               - Knowledge Graph 조회
+  Verify Loop                                - RAG 컨텍스트 검색
+       │                                           │
+       ▼                                           ▼
+[Ollama 로컬 LLM]  ◀──────── 컨텍스트 ───────────────
+  마이크로 태스크 추론
+       │
+       ▼
+[Verify Loop]
+  컴파일 → 린트 → 테스트 → Diff 리뷰
+```
+
 **설계 원칙 (Local LLM 특화)**:
 
 | 원칙 | 설명 |
@@ -319,18 +319,36 @@ vibe-flow/
 | Verify Every Step | 각 수정 후 컴파일/린트/테스트 필수 |
 | Continuous Reflection | 각 도구 실행 후 플랜 유효성 재점검 |
 
-**구현 항목**:
+**구현 항목 — 프로젝트별 분류**:
+
+#### 📁 [vibe-rag] Python 별도 프로젝트 (임시명 — 개발 시점에 구체화)
 
 - [ ] **Project Understanding Pipeline**
-  - 언어/패키지 매니저/빌드 도구/테스트 프레임워크 자동 감지
+  - 언어 / 패키지 매니저 / 빌드 / 테스트 프레임워크 자동 감지
   - 폴더 트리 + 의존성 그래프 생성
-  - 진입점/아키텍처 패턴 감지
+  - 진입점 / 아키텍처 패턴 감지
   - 결과를 `.ai/memory/project_summary.md`에 영구 저장
 
 - [ ] **Knowledge Graph 생성**
   - File → Class → Function → Call → Dependency → Test 그래프
-  - `.ai/knowledge/graph.json`에 저장
-  - 변경 시 자동 업데이트
+  - Python NetworkX 기반 구현 (TypeScript보다 생태계 풍부)
+  - `.ai/knowledge/graph.json`에 저장, 변경 시 자동 업데이트
+
+- [ ] **Context Retrieval (RAG)**
+  - Knowledge Graph 기반 관련 파일/함수만 선별 로드
+  - 임베딩 + 벡터 DB (Chroma or Qdrant — 개발 시점에 확정)
+  - 전체 저장소 로딩 방지
+
+- [ ] **MCP 서버 래핑**
+  - 위 3개 기능을 MCP 도구로 노출
+  - 예: `understand_project`, `query_graph`, `retrieve_context`
+  - Vibe Flow 플러그인 및 기타 MCP 클라이언트에서 재사용 가능
+
+#### 📁 [Vibe Flow 플러그인] 이 프로젝트 (src/agent/)
+
+- [ ] **MCP 클라이언트 연결**
+  - vibe-rag MCP 서버 연결
+  - Ollama + MCP 도구 연동
 
 - [ ] **Task Planner**
   - `.ai/tasks/task_xxx.md` 자동 생성
@@ -340,10 +358,6 @@ vibe-flow/
 - [ ] **Micro Task Decomposition 엔진**
   - 큰 목표를 함수 단위 스텝으로 분해
   - 각 스텝은 독립 실행 가능하도록 설계
-
-- [ ] **Context Retrieval**
-  - Knowledge Graph 기반 관련 파일/함수만 선별 로드
-  - 전체 저장소 로딩 방지
 
 - [ ] **Verify Loop 자동화**
   - 각 편집 후 자동으로: 컴파일 → 린트 → 단위 테스트 → Diff 리뷰
@@ -358,8 +372,10 @@ vibe-flow/
   - `.ai/tasks/TASK_HISTORY.md` 완료 태스크 이력 기록
 
 **산출물**:
+- [vibe-rag] Python RAG/KG 서비스 + MCP 서버 (별도 저장소)
+- [Vibe Flow] MCP 클라이언트 + 에이전트 루프 구현
 - Ollama 로컬 에이전트 동작 데모
-- `.ai/` 폴더 기반 프로젝트 메모리 시스템
+- `.ai/` 폴더 기반 프로젝트 영구 메모리 시스템
 - 마이크로 태스크 분해 및 검증 루프 문서화
 
 ---
@@ -484,6 +500,6 @@ vibe-flow/
 
 ---
 
-**작성일**: 2026-06-26  
-**버전**: 1.5  
+**작성일**: 2026-06-27  
+**버전**: 1.6  
 **상태**: Phase 3 Complete, Phase 4 In Progress, Phase 5 Planned
