@@ -186,6 +186,58 @@ const logger = getLogger('ChatManager');
 logger.info('Chat started');
 ```
 
+### 3.6 다국어 지원 (i18n) 컨벤션
+
+**언어 변경 방식**: VSCode 언어 설정을 따름 (`Configure Display Language` 명령)  
+재시작 없이 즉시 전환되며, 앱 내 별도 언어 선택 UI는 의도적으로 제공하지 않음.
+
+**계층별 구현 파일**:
+
+| 계층 | 파일 | 설명 |
+|------|------|------|
+| 마켓플레이스 메타 | `package.nls.json` | 영어 기본값 (명령어, 설정 설명) |
+| 마켓플레이스 메타 | `package.nls.ko.json` | 한국어 번역 |
+| Extension Host | `l10n/bundle.l10n.json` | 영어 번들 |
+| Extension Host | `l10n/bundle.l10n.ko.json` | 한국어 번들 |
+| WebView | `src/webview/i18n/en.ts` | 영어 메시지 맵 |
+| WebView | `src/webview/i18n/ko.ts` | 한국어 메시지 맵 |
+| WebView | `src/webview/i18n/index.ts` | I18nContext + useI18n 훅 |
+
+**새 문자열 추가 방법**:
+
+```typescript
+// 1. WebView에 새 문자열 추가
+// src/webview/i18n/en.ts
+const en = {
+  myNewString: 'New string in English',
+  // ...
+};
+
+// src/webview/i18n/ko.ts
+const ko: I18nMessages = {
+  myNewString: '새 문자열 (한국어)',
+  // ...
+};
+
+// 2. 컴포넌트에서 사용
+import { useI18n } from '../i18n';
+const t = useI18n();
+return <button>{t.myNewString}</button>;
+```
+
+**Extension Host 문자열 추가**:
+- `l10n/bundle.l10n.ko.json`에 `{ "영어 원문": "한국어 번역" }` 추가
+- 코드에서는 영어 원문 그대로 사용 (VSCode가 자동 치환)
+```typescript
+vscode.window.showInformationMessage('File saved successfully');
+// → 한국어 환경에서는 bundle.l10n.ko.json의 번역값으로 자동 표시
+```
+
+**금지 사항**:
+- ❌ 컴포넌트에 한국어/영어 문자열 직접 하드코딩
+- ❌ `useI18n()` 없이 문자열 직접 사용
+- ✅ 모든 사용자 표시 문자열은 i18n 파일에 정의
+
 ---
 
 ## 4. 에이전트별 역할 지침
@@ -322,6 +374,9 @@ SendMessage(to: 'a60caf18f7561ed1d', "작업을 완료하고 결과를 보고해
 | **개발 계획** | `PLAN.md` | Architect/PM |
 | **에이전트 지침** | `AGENTS.md` | Architect |
 | **Claude 전용 지침** | `CLAUDE.md` | Claude |
+| **i18n (패키지)** | `package.nls.json` / `package.nls.ko.json` | Architect/Developer |
+| **i18n (Extension)** | `l10n/bundle.l10n.json` / `bundle.l10n.ko.json` | Developer |
+| **i18n (WebView)** | `src/webview/i18n/` | Developer |
 
 ---
 
@@ -385,6 +440,6 @@ SendMessage(to: 'a60caf18f7561ed1d', "작업을 완료하고 결과를 보고해
 
 ---
 
-**마지막 업데이트**: 2026-06-26  
-**버전**: 1.1  
+**마지막 업데이트**: 2026-06-27  
+**버전**: 1.2  
 **Audience**: All AI Agents

@@ -419,6 +419,33 @@ vibe-flow/
 - **자동 반영**: 저장 후 VSCode `onDidChangeConfiguration` 발화 → 기존 `workspace_config_changed` 메시지로 UI 자동 갱신
 - **"Open VSCode Settings" 버튼**: 유지 (직접 편집 외에 VSCode 네이티브 설정 UI 접근 경로 보존)
 
+### 6.7 다국어 지원 (i18n) 설계 (Phase 4 완료)
+
+**언어 전환 방식**: VSCode 공식 l10n 방식 채택
+- Extension Host / 마켓플레이스: VSCode `Configure Display Language` 설정 자동 반영
+- WebView: `navigator.language` 기반 자동 감지 (ko → 한국어, 그 외 → 영어)
+- **앱 내 언어 선택 UI 없음**: VSCode 표준 패턴 준수 (대부분의 공식 익스텐션 동일 방식)
+
+**지원 언어**: 영어(기본), 한국어
+
+**파일 구조**:
+```
+package.nls.json          ← 마켓플레이스 영어 기본값
+package.nls.ko.json       ← 마켓플레이스 한국어 번역
+l10n/
+  bundle.l10n.json        ← Extension Host 영어 번들
+  bundle.l10n.ko.json     ← Extension Host 한국어 번들
+src/webview/i18n/
+  en.ts                   ← WebView 영어 메시지
+  ko.ts                   ← WebView 한국어 메시지
+  index.ts                ← I18nContext + useI18n 훅
+```
+
+**언어 추가 방법** (향후 일본어 등):
+1. `package.nls.ja.json` 생성
+2. `l10n/bundle.l10n.ja.json` 생성
+3. `src/webview/i18n/ja.ts` 생성 후 `index.ts`에 등록
+
 ### 6.6 Ollama Agentic Mode 설계 원칙 (Phase 5)
 
 **배경**: Ollama 로컬 모델은 클라우드 LLM 대비 컨텍스트 윈도우가 작고 추론 능력이 약함.
@@ -501,5 +528,5 @@ vibe-flow/
 ---
 
 **작성일**: 2026-06-27  
-**버전**: 1.6  
+**버전**: 1.7  
 **상태**: Phase 3 Complete, Phase 4 In Progress, Phase 5 Planned
