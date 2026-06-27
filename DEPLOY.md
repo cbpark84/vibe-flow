@@ -256,76 +256,61 @@ GitHub는 기존 "Classic branch protection rules" 외에 **Rulesets**라는 새
 
 ---
 
-### 5-2. VSCE_PAT 발급 + GitHub Secret 등록
+### 5-2. VSCE_PAT 발급 (마켓플레이스 자동 배포용)
 
-VSCE_PAT는 GitHub Actions에서 VS Code 마켓플레이스에 자동으로 배포할 때 사용하는 인증 토큰입니다.  
-**이 설정 없이도 릴리스 자체(VSIX 파일)는 GitHub Releases에 업로드됩니다.**  
-마켓플레이스 자동 배포를 원할 경우에만 이 단계가 필요합니다.
+> **⚠️ 2026년 3월 변경사항**: "All accessible organizations" 범위의 Global PAT는 신규 생성이 차단되었습니다.
+> 아래 가이드는 **조직 특정 PAT** 방식을 사용합니다. 동작 방식은 동일합니다.
 
-> **2026년 중요 변경사항**: Azure DevOps의 "Global PAT"(모든 조직에 적용되는 토큰)는  
-> 2026년 3월 15일부터 신규 생성이 차단되고, 2026년 12월 1일에 완전 폐지됩니다.  
-> **현재(2026년 6월) 기준으로 PAT는 아직 사용 가능**하며, 단일 조직 범위 PAT는 계속 지원됩니다.
+#### 5-2-1. Azure DevOps 조직 만들기
 
-#### Azure DevOps 조직 생성 (없는 경우)
+1. [https://dev.azure.com](https://dev.azure.com) 접속 → Microsoft 계정으로 로그인
+2. 첫 화면에서 **"Create new organization"** 클릭
+3. 조직 이름 입력 (예: `cbpark84-dev`) → 지역: **East Asia** 선택 → **Continue**
+4. 프로젝트 이름은 아무 이름이나 입력 → **Create project**
+   - 마켓플레이스 배포에는 프로젝트 내용이 필요 없음. 이름만 만들면 됨.
 
-1. https://dev.azure.com 접속 → Microsoft 계정으로 로그인
-2. 처음 접속 시 자동으로 조직 생성 화면이 나타납니다
-   - 이미 조직이 있다면 이 단계 건너뜀
-3. 조직 이름 입력 (예: `cbpark84`) → **Continue** 클릭
-4. 프로젝트 이름 입력 (예: `vibe-flow`) → **Create project** 클릭
+#### 5-2-2. Personal Access Token 발급
 
-> **팁**: Azure DevOps 조직은 PAT 발급을 위해서만 필요합니다.  
-> 프로젝트 안에 코드를 올릴 필요는 없습니다.
-
-#### Personal Access Token (PAT) 발급
-
-1. https://dev.azure.com 에 로그인된 상태로 접속
-2. 우측 상단 사람 모양 아이콘 클릭 → **Personal access tokens** 클릭
-   - 또는 직접 URL: https://dev.azure.com/{조직이름}/_usersSettings/tokens
-3. **+ New Token** 버튼 클릭
-4. 다음과 같이 입력합니다:
+1. 조직 대시보드 우측 상단 → **사람 아이콘 (User settings)** 클릭 → **Personal access tokens** 클릭
+2. **"New Token"** 파란 버튼 클릭
+3. 아래와 같이 입력:
 
    | 항목 | 값 |
    |------|----|
    | Name | `vibe-flow-marketplace` |
-   | Organization | **`All accessible organizations`** 선택 |
-   | Expiration | Custom defined → 1년 후 날짜 선택 |
-   | Scopes | **Custom defined** 선택 후 아래 참조 |
+   | Organization | **방금 만든 조직 선택** (All accessible organizations ❌ 선택 금지) |
+   | Expiration | 1 year (최대치) |
+   | Scopes | **Custom defined** 선택 후 아래 체크 |
 
-5. **Scopes** 항목에서:
-   - 페이지를 아래로 스크롤하여 **Marketplace** 섹션 찾기
-   - **Manage** 항목의 체크박스에 체크
-   
-   > **주의**: "Full access"를 선택하면 보안 위험이 있습니다.  
-   > 반드시 **Marketplace → Manage** 만 선택하세요.
+4. Scopes에서 **"Marketplace"** 항목 찾기 → **"Manage"** 체크박스 선택
+   - 💡 Marketplace 항목이 안 보이면 "Show all scopes" 링크 클릭
 
-6. **Create** 버튼 클릭
-7. 생성된 토큰이 화면에 표시됩니다 — **이때만 확인 가능하므로 즉시 복사**
+5. **"Create"** 버튼 클릭
+6. 생성된 토큰이 화면에 표시됨 → **즉시 복사** (창을 닫으면 다시 볼 수 없음!)
 
-   > **주의**: 창을 닫으면 토큰을 다시 볼 수 없습니다.  
-   > 메모장이나 비밀번호 관리자에 임시 저장하세요.
+   > ⚠️ 토큰은 생성 직후 한 번만 표시됩니다. 반드시 복사 후 안전한 곳에 임시 보관하세요.
 
-#### GitHub Secret 등록
+#### 5-2-3. GitHub Secret 등록
 
-1. GitHub 저장소 페이지로 이동
-2. **Settings** 탭 클릭
-3. 왼쪽 사이드바에서 **Secrets and variables** → **Actions** 클릭
-4. **New repository secret** 버튼 클릭
-5. 다음과 같이 입력:
+1. GitHub 저장소 → **Settings** 탭 클릭
+2. 왼쪽 메뉴: **Secrets and variables** → **Actions** 클릭
+3. **"New repository secret"** 버튼 클릭
+4. 입력:
+   - Name: `VSCE_PAT`
+   - Secret: (복사한 PAT 토큰 붙여넣기)
+5. **"Add secret"** 클릭
 
-   | 항목 | 값 |
-   |------|-----|
-   | Name | `VSCE_PAT` |
-   | Secret | (Azure DevOps에서 복사한 토큰 붙여넣기) |
+#### 5-2-4. 확인
 
-6. **Add secret** 클릭
+GitHub 저장소 → Settings → Secrets and variables → Actions 에서
+`VSCE_PAT` 항목이 목록에 보이면 완료.
 
-#### 완료 확인
+> **12월 이후 대안**: 2026년 12월 1일 이후에는 조직 특정 PAT도 폐지됩니다.
+> 그때는 VS Code Marketplace 웹 UI(marketplace.visualstudio.com/manage)에서
+> .vsix 파일을 수동으로 업로드하거나, Microsoft Entra ID 방식으로 전환하면 됩니다.
+> 지금은 이 방법으로 충분합니다.
 
-- GitHub Settings → Secrets and variables → Actions 페이지에서  
-  `VSCE_PAT`가 목록에 표시되면 등록 성공 (값은 보이지 않음)
-
-- [ ] Azure DevOps 조직 생성 완료 (또는 기존 조직 확인)
+- [ ] Azure DevOps 조직 생성 완료
 - [ ] Azure DevOps PAT 생성 완료 (Marketplace → Manage scope)
 - [ ] GitHub Secret `VSCE_PAT` 등록 완료
 
